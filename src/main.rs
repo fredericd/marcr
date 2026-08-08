@@ -3,28 +3,33 @@ use marc::{ Record, Field, Subfield };
 fn main() {
     let leader = [1,1,1];
     let fields = vec![
-        Field::Control { tag: 001, value: String::from("000001") },
-        Field::Control { tag: 005, value: String::from("2026") },
-        Field::Standard {
-            tag: 200,
-            ind: [' ', '1'],
-            subfs: vec![
-                Subfield { letter: 'a', value: String::from("Mon titre") },
-                Subfield { letter: 'e', value: String::from("Complément du titre") },
-            ],
-        },
-        Field::Standard {
-            tag: 700,
-            ind: [' ', '1'],
-            subfs: vec![
-                Subfield { letter: 'a', value: String::from("Demians") },
-                Subfield { letter: 'b', value: String::from("Frédéric") },
-            ],
-        },
+        Field::Control(001, String::from("000001")),
+        Field::Control(005, String::from("2026")),
+        Field::Standard(200, [' ', '1'],
+            vec![
+                Subfield('a', String::from("Mon titre")),
+                Subfield('e', String::from("Complément du titre")),
+            ]),
+        Field::Standard(700, [' ', '1'],
+            vec![
+                Subfield('a', "Demians".to_string()),
+                Subfield('b', String::from("Frédéric")),
+            ]),
     ];
-    let record = Record {
+    let mut record = Record {
         leader,
         fields
     };
-    println!("{record}");
+
+    let mut add_field = |values: Vec<&str>| -> () {
+        let tag: u16 = values[0].parse().expect("Tag invalude");
+        println!("val: {tag}");
+        record.add(Field::Standard(214, [' ', '1'],
+            vec![Subfield('a', "Paris".to_string())] ));
+        ()
+    };
+    add_field(vec!["200", "1 ", "a", "kjdsfksdfjk"]);
+
+    println!("{}", record);
 }
+
