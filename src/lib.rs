@@ -1,4 +1,6 @@
 use std::fmt;
+use std::io::Read;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
@@ -71,9 +73,16 @@ impl Record {
 }
 
 
-pub enum Reader {
-    Iso2709,
-    Marcxml,
+pub struct Iso2709Reader<R: Read> {
+    reader: R,
+}
+
+impl<R:Read> Iso2709Reader<R> {
+    pub fn new(reader: R) -> Self {
+        Iso2709Reader {
+            reader,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -124,6 +133,13 @@ mod marc_record {
 200  1 $a Mon titre $e Complément du titre
 700  1 $a Demians $b Frédéric");
         assert_eq!(text, expected);
+    }
+
+    #[test]
+    fn iso2709reader() {
+        let data = b!"    ";
+        let cursor = Cursor::new(data.to_vec());
+        ler reader = Iso2709Reader::new(cursor);
     }
 
 }
