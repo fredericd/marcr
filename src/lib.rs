@@ -135,11 +135,4 @@ mod marc_record {
         assert_eq!(text, expected);
     }
 
-    #[test]
-    fn iso2709reader() {
-        let data = b!"    ";
-        let cursor = Cursor::new(data.to_vec());
-        ler reader = Iso2709Reader::new(cursor);
-    }
-
 }
