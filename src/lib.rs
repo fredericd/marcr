@@ -1,6 +1,8 @@
 use std::fmt;
-use std::io::Read;
-use std::io::Cursor;
+use std::io::{ Write };
+use quick_xml::events::{BytesDecl, BytesText, BytesStart, BytesEnd, Event};
+use quick_xml::writer::Writer as XmlWriter;
+use quick_xml::reader::Reader as XmlReader;
 
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
@@ -47,7 +49,7 @@ impl fmt::Display for Field {
 
 #[derive(Debug)]
 pub struct Record {
-    pub leader: [u8; 3],
+    pub leader: [u8; 23],
     pub fields: Vec<Field>,
 }
 
@@ -70,17 +72,95 @@ impl Record {
             .unwrap_or(self.fields.len());
         self.fields.insert(pos, field);
     }
+
+    pub fn new(fields: Vec<Field>) -> Self {
+        let leader: [u8; 23] = *b"02761nam a2200445   450";
+        Self {
+            leader,
+            fields,
+        }
+    }
+
 }
 
-
-pub struct Iso2709Reader<R: Read> {
-    reader: R,
+pub struct MarcxmlWriter<W: Write> {
+    writer: XmlWriter<W>,
+    pub count: usize,
 }
 
-impl<R:Read> Iso2709Reader<R> {
-    pub fn new(reader: R) -> Self {
-        Iso2709Reader {
-            reader,
+impl<W:Write> MarcxmlWriter<W> {
+    /// Create a new MarcxmlWriter
+    ///
+    /// # Arguments
+    ///
+    /// - `writer` - Any target implementing the trait [`std::io::Write`]
+    pub fn new(writer: W) -> Self {
+        let xml_writer = XmlWriter::new_with_indent(writer, b' ', 2);
+        MarcxmlWriter {
+            writer: xml_writer,
+            count: 0,
+        }
+    }
+    
+    /// Write a MARC record
+    ///
+    /// # Arguments
+    ///
+    /// - `record`
+    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+        if self.count == 0 {
+            self.writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+            self.writer.write_event(Event::Start(BytesStart::new("collection")))?;
+        }
+
+        self.writer
+            .create_element("record")
+            .write_inner_content(|writer| {
+                let leader_str: &str = unsafe { str::from_utf8_unchecked(&record.leader) };
+                writer
+                    .create_element("leader")
+                    .write_text_content(BytesText::new(leader_str))?;
+                for field in record.fields.iter() {
+                    match field {
+                        Field::Control(tag, value) => {
+                            let tag_str = format!("{tag:03}");
+                            writer
+                                .create_element("controlfield")
+                                .with_attribute(("tag", tag_str.as_str()))
+                                .write_text_content(BytesText::new(value))?;
+                        },
+                        Field::Standard(tag, ind, subfields) => {
+                            let tag_str = format!("{tag:03}");
+                            writer
+                                .create_element("datafield")
+                                .with_attribute(("tag", tag_str.as_str()))
+                                .with_attribute(("ind1", ind[0].to_string().as_str()))
+                                .with_attribute(("ind2", ind[1].to_string().as_str()))
+                                .write_inner_content(|w| {
+                                    for Subfield(letter, value) in subfields {
+                                        let letter_str = format!("{letter}");
+                                        w
+                                            .create_element("subfield")
+                                            .with_attribute(("code", letter_str.as_str()))
+                                            .write_text_content(BytesText::new(value))?;
+                                    }
+                                    Ok(())
+                                })?;
+                        },
+                    }
+                }
+                Ok(())
+            })?;
+        self.count = self.count + 1;
+        Ok(())
+    }
+}
+
+impl<W: Write> Drop for MarcxmlWriter<W> {
+    fn drop(&mut self) {
+        let event = Event::End(BytesEnd::new("collection"));
+        if let Err(e) = self.writer.write_event(event) {
+            panic!("drop MarcxmlWriter: {e}");
         }
     }
 }
