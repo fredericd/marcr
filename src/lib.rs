@@ -2,7 +2,6 @@ use std::fmt;
 use std::io::{ Write };
 use quick_xml::events::{BytesDecl, BytesText, BytesStart, BytesEnd, Event};
 use quick_xml::writer::Writer as XmlWriter;
-use quick_xml::reader::Reader as XmlReader;
 
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
@@ -81,8 +80,54 @@ impl Record {
         }
     }
 
+    pub fn insert(a_a_a: Vec<Vec<&str>>) {
+        for a_a in a_a_a {
+            let len = a_a.len();
+            if len < 2 { continue; }
+            let tag_str = a_a[0];
+            if let Ok(tag) = tag_str.parse::<u16>() {
+                if tag <= 9 {
+                    if len == 2 {
+                        let field = Field::Control(tag, String::from(a_a[1]));
+                    }
+                }
+                else if tag <= 999 {
+
+                }
+            }
+        }
+    }
 }
 
+pub struct Iso2709Writer<W: Write> {
+    writer: W,
+    pub count: usize,
+}
+
+impl<W:Write> Iso2709Writer<W> {
+    /// Create a new MarcxmlWriter
+    ///
+    /// # Arguments
+    ///
+    /// - `writer` - Any target implementing the trait [`std::io::Write`]
+    pub fn new(writer: W) -> Self {
+        Iso2709Writer {
+            writer,
+            count: 0,
+        }
+    }
+    
+    /// Write a MARC record
+    ///
+    /// # Arguments
+    ///
+    /// - `record`
+    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+
+        self.count = self.count + 1;
+        Ok(())
+    }
+}
 pub struct MarcxmlWriter<W: Write> {
     writer: XmlWriter<W>,
     pub count: usize,
