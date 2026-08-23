@@ -6,7 +6,9 @@ version = 4
 name = "marcr"
 version = "0.1.0"
 dependencies = [
+ "memchr",
  "quick-xml",
+ "smallvec",
 ]
 
 [[package]]
@@ -23,3 +25,9 @@ checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "smallvec"
+version = "1.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"

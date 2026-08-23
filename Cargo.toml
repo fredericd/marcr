@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 quick-xml = "0.41"
+memchr = "2.7"
+smallvec = "1.13"
+

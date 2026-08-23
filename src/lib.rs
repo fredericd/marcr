@@ -1,9 +1,9 @@
 use std::fmt;
 use std::str;
-use std::io::{ Write, Read, BufRead, Split };
-use quick_xml::events::{BytesDecl, BytesText, BytesStart, BytesEnd, Event};
+use std::io::{ Write, Read, BufRead };
+use quick_xml::events::{BytesText};
 use quick_xml::writer::Writer as XmlWriter;
-
+use memchr::memchr;
 
 const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
@@ -20,6 +20,9 @@ impl fmt::Display for Subfield {
     }
 }
 
+/// A MARC record field representation.
+///
+/// A field can be a control field or a standard field
 #[derive(Debug)]
 pub enum Field {
     Control(u16, String),
@@ -150,17 +153,7 @@ pub struct RWDescription {
 }
 
 impl Format {
-    pub fn get_available_readers() -> Vec<RWDescription> {
-        vec![
-            RWDescription{
-                format: Format::Iso2709,
-                description: String::from("ISO 2709"),
-                extension: String::from("mrc"),
-            },
-        ]
-    }
-
-    pub fn get_available_writers() -> Vec<RWDescription> {
+    pub fn get_available_formats() -> Vec<RWDescription> {
         vec![
             RWDescription{
                 format: Format::Iso2709,
@@ -179,106 +172,24 @@ impl Format {
             },
         ]
     }
-}
 
-
-
-pub trait RecordWriter {
-    /// Écrit un enregistrement MARC dans le flux
-    fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>>;
-
-    /// Vide les tampons sous-jacents si nécessaire
-    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(()) // Implémentation par défaut vide
-    }
-}
-
-
-pub trait RecordReader {
-    /// Écrit un enregistrement structuré dans le flux
-    fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>>;
-
-    /// Vide les tampons sous-jacents si nécessaire
-    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(()) // Implémentation par défaut vide
-    }
-}
-
-
-pub enum Reader<R: Read + BufRead> {
-    Iso2709(Iso2709Reader<R>),
-}
-
-impl<R: Read + BufRead> Reader<R> {
-    /// Constructeur basé sur l'enum Format
-    pub fn new(format: Format, reader: R) -> Self {
-        match format {
-            Format::Iso2709 => Reader::Iso2709(Iso2709Reader::new(reader)),
-            Format::Marcxml => panic!("Pas Marxml"),
-            Format::Text => panic!("Pas Text Reader"),
-        }
-    }
-    
-    /// Méthode d'interface unifiée
-    pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+    pub fn deserialize(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         match self {
-            Reader::Iso2709(r) => r.read(),
+            Format::Iso2709 => self.deserialize_iso2709(octets),
+            Format::Marcxml => self.deserialize_marcxml(octets),
+            Format::Text => self.deserialize_text(octets),
         }
     }
-}
 
-pub enum Writer<W: Write> {
-    Iso2709(Iso2709Writer<W>),
-    Marcxml(MarcxmlWriter<W>),
-    Text(TextWriter<W>),
-}
-
-impl<W: Write> Writer<W> {
-    /// Constructeur basé sur l'enum Format
-    pub fn new(format: Format, writer: W) -> Self {
-        match format {
-            Format::Iso2709 => Writer::Iso2709(Iso2709Writer::new(writer)),
-            Format::Marcxml => Writer::Marcxml(MarcxmlWriter::new(writer)),
-            Format::Text => Writer::Text(TextWriter::new(writer)),
-        }
-    }
-}
-    
-impl<W: Write> RecordWriter for Writer<W> {
-    /// Méthode d'interface unifiée
-    fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn serialize(&self, record: &Record) -> Vec<u8> {
         match self {
-            Writer::Iso2709(w) => w.write(record),
-            Writer::Marcxml(w) => w.write(record),
-            Writer::Text(w) => w.write(record),
-        }
-    }
-}
-
-pub struct Iso2709Writer<W: Write> {
-    writer: W,
-    pub count: usize,
-}
-
-impl<W:Write> Iso2709Writer<W> {
-    /// Create a new MarcxmlWriter
-    ///
-    /// # Arguments
-    ///
-    /// - `writer` - Any target implementing the trait [`std::io::Write`]
-    pub fn new(writer: W) -> Self {
-        Iso2709Writer {
-            writer,
-            count: 0,
+            Format::Iso2709 => self.serialize_iso2709(record),
+            Format::Marcxml => self.serialize_marcxml(record),
+            Format::Text => self.serialize_text(record),
         }
     }
 
-    /// Write a MARC record
-    ///
-    /// # Arguments
-    ///
-    /// - `record`
-    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn serialize_iso2709(&self, record: &Record) -> Vec<u8> {
         let mut fields: Vec<u8> = Vec::new();
         let mut directory: Vec<u8> = Vec::new();
         let mut from = 0;
@@ -318,76 +229,50 @@ impl<W:Write> Iso2709Writer<W> {
         let mut data: Vec<u8> = leader.to_vec();
         data.extend_from_slice(&directory);
         data.extend_from_slice(&fields);
-        self.writer.write(&data)?;
-        self.count = self.count + 1;
-        Ok(())
-    }
-}
-
-pub struct Iso2709Reader<R: Read> {
-    iterator: Split<R>,
-    pub count: usize,
-}
-
-impl<R:Read + BufRead> Iso2709Reader<R> {
-    /// Create a new Iso2709Reader
-    ///
-    /// # Arguments
-    ///
-    /// - `reader` - Any target implementing the trait [`std::io::Read`]
-    pub fn new(reader: R) -> Self {
-        let iterator = reader.split(RT);
-        Iso2709Reader {
-            iterator,
-            count: 0,
-        }
+        data
     }
     
-    /// Read a MARC record
-    ///
-    /// # Arguments
-    ///
-    /// - `record`
-    pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
-        let result = match self.iterator.next() {
-            Some(raw) => raw?,
-            None      => { return Ok(None); } // No more data to read
-        };
-        let raw: &[u8] = &result;
-        //if raw.len() < 40 { return Box(Err("Invalid record. Too short")); }
-        let leader: [u8; 24] = raw[..24].try_into().unwrap();
-        let text = std::str::from_utf8(&raw[12..17])?;
+    pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+        if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
+        let leader: [u8; 24] = octets[..24].try_into().unwrap();
+        let text = std::str::from_utf8(&octets[12..17])?;
         let directory_len: usize = text.parse::<usize>().unwrap();
         let number_of_tags = (directory_len - 24 - 1) / 12;
         let mut fields: Vec<Field> = Vec::with_capacity(number_of_tags);
         for i in 0..number_of_tags {
             let directory_offset = 24 + i * 12;
-            let mut text = std::str::from_utf8(&raw[directory_offset..directory_offset+3])?;
-            let tag: u16 = text.parse::<u16>().unwrap();
-            text = std::str::from_utf8(&raw[directory_offset+3..directory_offset+3+4])?;
-            let len: usize = text.parse::<usize>().unwrap() - 1;
-            text = std::str::from_utf8(&raw[directory_offset+3+4..directory_offset+3+4+5])?;
+            let mut text = std::str::from_utf8(&octets[directory_offset..directory_offset+3])?;
+            let tag: u16 = match text.parse::<u16>() {
+                Ok(tag) => tag,
+                Err(_) => return Err("Bad ISO2709, tag non numérique".into()),
+            };
+            text = std::str::from_utf8(&octets[directory_offset+3..directory_offset+3+4])?;
+            let len: usize = match text.parse::<usize>() {
+                Ok(len) => len - 1,
+                Err(_) => return Err("Bad ISO2709, length non numérique".into()),
+            };
+            text = std::str::from_utf8(&octets[directory_offset+3+4..directory_offset+3+4+5])?;
             let offset: usize = text.parse::<usize>().unwrap();
             let base = directory_len + offset;
             if tag < 10 {
-                let octets = &raw[base..base + len];
-                let value: String = std::str::from_utf8(octets)?.to_string();
+                let slice = &octets[base..base + len];
+                let value: String = std::str::from_utf8(slice)?.to_string();
                 fields.push(Field::Control(tag, value));
             } else {
-                let ind: [char; 2] = [raw[base] as char, raw[base+1] as char];
+                let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
                 let mut j = base + 2;
                 let mut subfields: Vec<Subfield> = Vec::new();
                 while j < base + len {
-                    if raw[j] == DE {
+                    if octets[j] == DE {
                         j += 1;
-                        let letter: char = raw[j] as char;
+                        let letter: char = octets[j] as char;
                         j += 1;
                         let mut k = j;
-                        while !(raw[k] == DE || raw[k] == FT) {
+                        while !(octets[k] == DE || octets[k] == FT) {
                             k += 1;
                         }
-                        let octets = &raw[j..k];
-                        let value: String = std::str::from_utf8(octets)?.to_string();
+                        let slice = &octets[j..k];
+                        let value: String = std::str::from_utf8(slice)?.to_string();
                         j = k;
                         subfields.push(Subfield(letter, value));
                     }
@@ -402,93 +287,13 @@ impl<R:Read + BufRead> Iso2709Reader<R> {
             leader,
             fields,
         };
-        self.count = self.count + 1;
-        Ok(Some(record))
-    }
-}
-
-pub struct TextWriter<W: Write> {
-    writer: W,
-    count: usize,
-}
-
-impl<W:Write> TextWriter<W> {
-    /// Create a new TextWriter
-    ///
-    /// # Arguments
-    ///
-    /// - `writer` - Any target implementing the trait [`std::io::Write`]
-    pub fn new(writer: W) -> Self {
-        TextWriter {
-            writer,
-            count: 0,
-        }
+        Ok(record)
     }
 
-    /// Write a MARC record
-    ///
-    /// # Arguments
-    ///
-    /// - `record`
-    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
-        self.count = self.count + 1;
-        let mut lines: Vec<String> = Vec::new();
-        let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
-        lines.push(leader.to_string());
-        for field in record.fields.iter() {
-            match field {
-                Field::Control(tag, value) => {
-                    lines.push(format!("{tag:03}    {value}"));
-                },
-                Field::Standard(tag, ind, subfields) => {
-                    let ind1 = ind[0];
-                    let ind2 = ind[1];
-                    let concatenated = subfields
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    lines.push(format!("{tag:03} {ind1}{ind2} {concatenated}"));
-                }
-            }
-        }
-        lines.push("\n".to_string());
-        self.writer.write(lines.join("\n").as_bytes())?;
-        Ok(())
-    }
-}
-
-pub struct MarcxmlWriter<W: Write> {
-    writer: XmlWriter<W>,
-    pub count: usize,
-}
-
-impl<W:Write> MarcxmlWriter<W> {
-    /// Create a new MarcxmlWriter
-    ///
-    /// # Arguments
-    ///
-    /// - `writer` - Any target implementing the trait [`std::io::Write`]
-    pub fn new(writer: W) -> Self {
-        let xml_writer = XmlWriter::new_with_indent(writer, b' ', 2);
-        MarcxmlWriter {
-            writer: xml_writer,
-            count: 0,
-        }
-    }
-    
-    /// Write a MARC record
-    ///
-    /// # Arguments
-    ///
-    /// - `record`
-    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
-        if self.count == 0 {
-            self.writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
-            self.writer.write_event(Event::Start(BytesStart::new("collection")))?;
-        }
-
-        self.writer
+    pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
+        let cursor = std::io::Cursor::new(Vec::new());
+        let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
+        match xml_writer
             .create_element("record")
             .write_inner_content(|writer| {
                 let leader_str: &str = unsafe { str::from_utf8_unchecked(&record.leader) };
@@ -525,18 +330,176 @@ impl<W:Write> MarcxmlWriter<W> {
                     }
                 }
                 Ok(())
-            })?;
-        self.count = self.count + 1;
+            }) {
+                Ok(_) => 1,
+                Err(_) => 1, // No error possible!
+            };
+        let cursor = xml_writer.into_inner();
+        let octets: Vec<u8> = cursor.into_inner();
+        octets
+    }
+
+    pub fn deserialize_marcxml(&self, _octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+        return Err("No serializer available".into());
+    }
+
+    pub fn serialize_text_slow(&self, record: &Record) -> Vec<u8> {
+        let mut lines: Vec<String> = Vec::new();
+        let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
+        lines.push(leader.to_string());
+        for field in record.fields.iter() {
+            match field {
+                Field::Control(tag, value) => {
+                    lines.push(format!("{tag:03}    {value}"));
+                },
+                Field::Standard(tag, ind, subfields) => {
+                    let ind1 = ind[0];
+                    let ind2 = ind[1];
+                    let concatenated = subfields
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    lines.push(format!("{tag:03} {ind1}{ind2} {concatenated}"));
+                }
+            }
+        }
+        lines.push("\n".to_string());
+        lines.join("\n").into_bytes()
+    }
+
+    pub fn serialize_text(&self, record: &Record) -> Vec<u8> {
+        let mut buffer: Vec<u8> = Vec::new();
+        let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
+        write!(buffer, "{}\n", leader).unwrap();
+        for field in record.fields.iter() {
+            match field {
+                Field::Control(tag, value) => {
+                    write!(buffer, "{tag:03}    {value}\n").unwrap();
+                },
+                Field::Standard(tag, ind, subfields) => {
+                    let ind1 = ind[0];
+                    let ind2 = ind[1];
+                    write!(buffer, "{tag:03} {ind1}{ind2} ").unwrap();
+                    let mut first = true;
+                    subfields.iter().for_each(|Subfield(l,v)| {
+                        if first {
+                            write!(buffer, "${l} {v}").unwrap();
+                            first = false;
+                        } else {
+                            write!(buffer, " ${l} {v}").unwrap();
+                        }                           
+                    });
+                    write!(buffer, "\n").unwrap();
+                }
+            }
+        }
+        write!(buffer, "\n").unwrap();
+        buffer
+    }
+
+    pub fn deserialize_text(&self, _octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+        return Err("No serializer available".into());
+    }
+
+
+}
+
+pub struct Reader<R> {
+    pub format: Format,
+    pub reader: R,
+    pub count: usize,
+}
+
+impl<R: Read + BufRead> Reader<R> {
+    
+    pub fn new(format: Format, reader: R) -> Self {
+        let count = 0;
+        Self { format, reader, count }
+    }
+
+    pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+        match self.format {
+            Format::Iso2709 => self.read_iso2709(),
+            Format::Marcxml => return Err("Pas de parser pour Marcxml".into()),
+            Format::Text    => return Err("Pas de parser pour Text".into()),
+        }
+    }
+
+    pub fn read_iso2709(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+        // Tampon de secours uniquement pour les notices plus grandes que la taille du BufReader
+        let mut scratch = Vec::new();
+        let mut found = false;
+        let mut option_record: Option<Record> = None;
+        while !found {
+            let available = self.reader.fill_buf()?;
+            if available.is_empty() {
+                // End of reader without finding RT. Return None
+                break;
+            }       
+            let consumed = {
+                if let Some(pos) = memchr(RT, available) {
+                    if scratch.is_empty() {
+                        // Found in reader buffer. No need to use scratch, ie zero-copy
+                        let octets = &available[..=pos];
+                        option_record = Some(self.format.deserialize(octets)?);
+                    } else {
+                        // Found a record which was extended on several reader buffer
+                        scratch.extend_from_slice(&available[..=pos]);
+                        option_record = Some(self.format.deserialize(&scratch)?);
+                    }
+                    found = true;
+                    pos + 1
+                } else {
+                    scratch.extend_from_slice(available);
+                    available.len()
+                }
+            };
+            self.reader.consume(consumed);
+        }
+        Ok(option_record)
+    }
+}
+
+pub struct Writer<W: Write> {
+    pub format: Format,
+    pub writer: W,
+    pub count: usize,
+}
+
+impl<W: Write> Writer<W> {
+
+    pub fn new(format: Format, writer: W) -> Self {
+        let count = 0;
+        Self { format, writer, count }
+    }
+
+    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+        let octets = self.format.serialize(record);
+        self.writer.write(&octets)?;
+        self.count += 1;
         Ok(())
     }
 }
 
-impl<W: Write> Drop for MarcxmlWriter<W> {
-    fn drop(&mut self) {
-        let event = Event::End(BytesEnd::new("collection"));
-        if let Err(e) = self.writer.write_event(event) {
-            panic!("drop MarcxmlWriter: {e}");
-        }
+pub trait RecordWriter {
+    /// Écrit un enregistrement MARC dans le flux
+    fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>>;
+
+    /// Vide les tampons sous-jacents si nécessaire
+    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(()) // Implémentation par défaut vide
+    }
+}
+
+
+pub trait RecordReader {
+    /// Écrit un enregistrement structuré dans le flux
+    fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>>;
+
+    /// Vide les tampons sous-jacents si nécessaire
+    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(()) // Implémentation par défaut vide
     }
 }
 
@@ -600,18 +563,10 @@ mod tests {
     }
 
     #[test]
-    fn rw_formater() -> Result<(), Box<dyn std::error::Error>> {
-        let writers = Format::get_available_writers();
-        for writer in writers {
-            println!("{} / {}", writer.description, writer.extension);
-        }
-        Ok(())
-    }
-
-    #[test]
     fn text_writer() -> Result<(), Box<dyn std::error::Error>> {
         let record = get_default_record();
-        let mut writer = TextWriter::new(std::io::Cursor::new(Vec::new()));
+        let format = Format::Text;
+        let mut writer = Writer::new(format, std::io::Cursor::new(Vec::new()));
         let _ = writer.write(&record);
         let octets: Vec<u8> = writer.writer.into_inner();
         let text = String::from_utf8(octets)?;
@@ -629,7 +584,7 @@ mod tests {
     #[test]
     fn iso2709_writer() -> Result<(), Box<dyn std::error::Error>> {
         let record = get_default_record();
-        let mut writer = Iso2709Writer::new(std::io::Cursor::new(Vec::new()));
+        let mut writer = Writer::new(Format::Iso2709, std::io::Cursor::new(Vec::new()));
         let _ = writer.write(&record);
         let octets: Vec<u8> = writer.writer.into_inner();
         let text = String::from_utf8(octets)?;
@@ -642,7 +597,7 @@ mod tests {
     fn iso2709_reader() {
         let raw = String::from("00146nam a2200073   4500001000700000005000500007200003600012700002400048\u{1e}000001\u{1e}2026\u{1e} 1\u{1f}aMon titre\u{1f}eComplément du titre\u{1e} 1\u{1f}aDemians\u{1f}bFrédéric\u{1e}\u{1d}");
         let cursor = std::io::Cursor::new(raw.as_bytes());
-        let mut reader = Iso2709Reader::new(cursor);
+        let mut reader = Reader::new(Format::Iso2709, cursor);
         match reader.read() {
             Ok(value) => {
                 match value {
@@ -687,6 +642,11 @@ mod tests {
 610    $a Sujet 1
 610    $a Sujet 2");
         assert_eq!(text, expected);
+    }
+
+    #[test]
+    fn marc_reader() {
+        let format = Format::Iso2709;
     }
 
 }
