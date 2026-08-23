@@ -194,7 +194,7 @@ impl Format {
         let mut directory: Vec<u8> = Vec::new();
         let mut from = 0;
         for field in record.fields.iter() {
-            let mut data: Vec<u8> = Vec::new();
+            let mut data: Vec<u8> = Vec::with_capacity(2000);
             let tag = match field {
                 Field::Control(tag, value) => {
                     data.extend_from_slice(value.as_bytes());
