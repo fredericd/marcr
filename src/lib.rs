@@ -256,12 +256,12 @@ impl Format {
             let base = directory_len + offset;
             if tag < 10 {
                 let slice = &octets[base..base + len];
-                let value: String = std::str::from_utf8(slice)?.to_string();
+                let value = String::from_utf8(slice.to_vec())?;
                 fields.push(Field::Control(tag, value));
             } else {
                 let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
                 let mut j = base + 2;
-                let mut subfields: Vec<Subfield> = Vec::new();
+                let mut subfields: Vec<Subfield> = Vec::with_capacity(5);
                 while j < base + len {
                     if octets[j] == DE {
                         j += 1;
@@ -272,7 +272,7 @@ impl Format {
                             k += 1;
                         }
                         let slice = &octets[j..k];
-                        let value: String = std::str::from_utf8(slice)?.to_string();
+                        let value = String::from_utf8(slice.to_vec())?;
                         j = k;
                         subfields.push(Subfield(letter, value));
                     }
