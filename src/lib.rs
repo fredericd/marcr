@@ -139,6 +139,7 @@ impl Record {
     }
 }
 
+#[derive(PartialEq)]
 pub enum Format {
   Iso2709,
   Marcxml,
@@ -394,7 +395,6 @@ impl Format {
                 }
             }
         }
-        write!(buffer, "\n").unwrap();
         buffer
     }
 
@@ -475,6 +475,12 @@ impl<W: Write> Writer<W> {
     }
 
     pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+        if self.format == Format::Marcxml && self.count == 0 {
+            self.writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collection>\n".as_bytes())?;
+        }
+        if self.count > 0 && (self.format == Format::Text || self.format == Format::Marcxml) {
+            self.writer.write("\n".as_bytes())?;
+        }
         let octets = self.format.serialize(record);
         self.writer.write(&octets)?;
         self.count += 1;
@@ -482,27 +488,13 @@ impl<W: Write> Writer<W> {
     }
 }
 
-pub trait RecordWriter {
-    /// Écrit un enregistrement MARC dans le flux
-    fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>>;
-
-    /// Vide les tampons sous-jacents si nécessaire
-    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(()) // Implémentation par défaut vide
+impl<W: Write> Drop for Writer<W> {
+    fn drop(&mut self) {
+        if self.format == Format::Marcxml {
+            let _ = self.writer.write("\n</collection>\n".as_bytes());
+        }
     }
 }
-
-
-pub trait RecordReader {
-    /// Écrit un enregistrement structuré dans le flux
-    fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>>;
-
-    /// Vide les tampons sous-jacents si nécessaire
-    fn flush(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(()) // Implémentation par défaut vide
-    }
-}
-
 
 //
 // Module des tests unitaires
@@ -568,14 +560,13 @@ mod tests {
         let format = Format::Text;
         let mut writer = Writer::new(format, std::io::Cursor::new(Vec::new()));
         let _ = writer.write(&record);
-        let octets: Vec<u8> = writer.writer.into_inner();
+        let octets: Vec<u8> = writer.writer.get_ref().as_slice().to_vec();
         let text = String::from_utf8(octets)?;
         let expected = String::from("00000nam a2200000   4500
 001    000001
 005    2026
 200  1 $a Mon titre $e Complément du titre
 700  1 $a Demians $b Frédéric
-
 ");
         assert_eq!(text, expected);
         Ok(())
@@ -586,7 +577,7 @@ mod tests {
         let record = get_default_record();
         let mut writer = Writer::new(Format::Iso2709, std::io::Cursor::new(Vec::new()));
         let _ = writer.write(&record);
-        let octets: Vec<u8> = writer.writer.into_inner();
+        let octets: Vec<u8> = writer.writer.get_ref().as_slice().to_vec();
         let text = String::from_utf8(octets)?;
         let expected = String::from("00146nam a2200073   4500001000700000005000500007200003600012700002400048\u{1e}000001\u{1e}2026\u{1e} 1\u{1f}aMon titre\u{1f}eComplément du titre\u{1e} 1\u{1f}aDemians\u{1f}bFrédéric\u{1e}\u{1d}");
         assert_eq!(text, expected);
