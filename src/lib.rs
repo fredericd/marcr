@@ -1,8 +1,9 @@
 use std::fmt;
 use std::str;
 use std::io::{ Write, Read, BufRead };
-use quick_xml::events::{BytesText};
+use quick_xml::events::{BytesText, Event};
 use quick_xml::writer::Writer as XmlWriter;
+use quick_xml::reader::Reader as XmlReader;
 use memchr::memchr;
 
 const FT: u8 = 0x1e; // Field terminator
@@ -232,7 +233,7 @@ impl Format {
         data.extend_from_slice(&fields);
         data
     }
-    
+ 
     pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
         let leader: [u8; 24] = octets[..24].try_into().unwrap();
@@ -279,7 +280,7 @@ impl Format {
                     }
                     else {
                         j += 1;
-                    }                       
+                    }
                 }
                 fields.push(Field::Standard(tag, ind, subfields));
             }
@@ -294,6 +295,7 @@ impl Format {
     pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
         let cursor = std::io::Cursor::new(Vec::new());
         let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
+        println!("on y est");
         match xml_writer
             .create_element("record")
             .write_inner_content(|writer| {
@@ -340,8 +342,90 @@ impl Format {
         octets
     }
 
-    pub fn deserialize_marcxml(&self, _octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
-        return Err("No serializer available".into());
+    pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+        let xml: &str = unsafe { str::from_utf8_unchecked(octets) };
+        let mut reader = XmlReader::from_str(xml);
+        let mut record = Record::new_empty();
+        let mut field: Option<Field> = None;
+        let mut buf = Vec::new();
+        loop {
+            match reader.read_event_into(&mut buf)? {
+                Event::Start(e) if e.name().as_ref() == b"record" => {
+                    record = Record::new_empty();
+                }
+                Event::Start(e) if e.name().as_ref() == b"leader" => {
+                    let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                    let leader = contenu.as_bytes();
+                    if leader.len() == 24 {
+                        record.leader[..24].copy_from_slice(&leader[..24]);
+                    }
+                },
+                Event::Start(e) if e.name().as_ref() == b"controlfield" => {
+                    let tag = e.attributes()
+                        .flatten()
+                        .find(|attr| attr.key.as_ref() == b"tag")
+                        .map(|attr| String::from_utf8_lossy(&attr.value).into_owned());
+                    if let Some(t) = tag {
+                        let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                        let tt: u16 = t.parse().unwrap();
+                        let cf = Field::Control(tt, contenu);
+                        record.fields.push(cf);
+                    }
+                },
+                Event::Start(e) if e.name().as_ref() == b"datafield" => {
+                    // Extraction : tag, ind1, ind2
+                    let mut tag: Option<u16> = None;
+                    let mut ind1 = None;
+                    let mut ind2 = None;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"tag" => tag = Some(String::from_utf8_lossy(&attr.value).into_owned().parse().unwrap()),
+                            b"ind1" => ind1 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
+                            b"ind2" => ind2 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
+                            _ => ()
+                        }
+                    }
+                    if let Some(tag) = tag {
+                        let i1 = ind1.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
+                        let i2 = ind2.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
+                        let subfields = Vec::new();
+                        field = Some(Field::Standard(tag, [i1, i2], subfields));
+                    }
+                }
+                Event::Start(e) if e.name().as_ref() == b"subfield" => {
+                    // Extraction : code
+                    let mut code = None;
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"code" => code = Some(String::from_utf8_lossy(&attr.value).into_owned()),
+                            _ => (),
+                        };
+                    }
+                    if let Some(code) = code {
+                        let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                        let letter = code.chars().next().unwrap_or(' ');
+                        let subfield = Subfield(letter, contenu);
+                        if let Some(f) = field.as_mut() {
+                            match f {
+                                Field::Standard(_, _, subfields) => {
+                                    subfields.push(subfield);
+                                },
+                                _ => (),
+                            };
+                        }
+                    }
+                },
+                Event::End(e) if e.name().as_ref() == b"datafield" => {
+                    if let Some(f) = field.take() {
+                        record.fields.push(f);
+                    }
+                },
+                Event::Eof => break,
+                _ => (),
+            }
+            buf.clear();
+        }
+        Ok(record)
     }
 
     pub fn serialize_text_slow(&self, record: &Record) -> Vec<u8> {
@@ -389,7 +473,7 @@ impl Format {
                             first = false;
                         } else {
                             write!(buffer, " ${l} {v}").unwrap();
-                        }                           
+                        }
                     });
                     write!(buffer, "\n").unwrap();
                 }
@@ -412,7 +496,6 @@ pub struct Reader<R> {
 }
 
 impl<R: Read + BufRead> Reader<R> {
-    
     pub fn new(format: Format, reader: R) -> Self {
         let count = 0;
         Self { format, reader, count }
@@ -436,7 +519,7 @@ impl<R: Read + BufRead> Reader<R> {
             if available.is_empty() {
                 // End of reader without finding RT. Return None
                 break;
-            }       
+            }
             let consumed = {
                 if let Some(pos) = memchr(RT, available) {
                     if scratch.is_empty() {
@@ -503,8 +586,16 @@ impl<W: Write> Drop for Writer<W> {
 mod tests {
     use super::*;
 
+    const EXPECTED_DEFAULT_RECORD: &str = "00146nam a2200073   4500
+001    000001
+005    2026
+200  1 $a Mon titre $e Complément du titre
+700  1 $a Demians $b Frédéric";
+
     fn get_default_record() -> Record {
-        let leader: [u8; 24] = DEFAULT_LEADER;
+        let mut leader: [u8; 24] = DEFAULT_LEADER;
+        leader[0..5].copy_from_slice(b"00146");
+        leader[15..17].copy_from_slice(b"73");
         let fields = vec![
             Field::Control(001, String::from("000001")),
             Field::Control(005, String::from("2026")),
@@ -546,11 +637,7 @@ mod tests {
     fn record_display() {
         let record = get_default_record();
         let text = record.to_string();
-        let expected = String::from("00000nam a2200000   4500
-001    000001
-005    2026
-200  1 $a Mon titre $e Complément du titre
-700  1 $a Demians $b Frédéric");
+        let expected = String::from(EXPECTED_DEFAULT_RECORD);
         assert_eq!(text, expected);
     }
 
@@ -562,12 +649,7 @@ mod tests {
         let _ = writer.write(&record);
         let octets: Vec<u8> = writer.writer.get_ref().as_slice().to_vec();
         let text = String::from_utf8(octets)?;
-        let expected = String::from("00000nam a2200000   4500
-001    000001
-005    2026
-200  1 $a Mon titre $e Complément du titre
-700  1 $a Demians $b Frédéric
-");
+        let expected = String::from(EXPECTED_DEFAULT_RECORD) + "\n";
         assert_eq!(text, expected);
         Ok(())
     }
@@ -594,11 +676,7 @@ mod tests {
                 match value {
                     Some(record) => {
                         let text = record.to_string();
-                        let expected = String::from("00146nam a2200073   4500
-001    000001
-005    2026
-200  1 $a Mon titre $e Complément du titre
-700  1 $a Demians $b Frédéric");
+                        let expected = String::from(EXPECTED_DEFAULT_RECORD);
                         assert_eq!(text, expected);
 
                     },
@@ -609,6 +687,31 @@ mod tests {
                 panic!("Reading error: {e}");
             }
         }
+    }
+
+    #[test]
+    fn marcxml_deserialize() {
+        let xml = String::from("<record>
+  <leader>00146nam a2200073   4500</leader>
+  <controlfield tag=\"001\">000001</controlfield>
+  <controlfield tag=\"005\">2026</controlfield>
+  <datafield tag=\"200\" ind1=\" \" ind2=\"1\">
+    <subfield code=\"a\">Mon titre</subfield>
+    <subfield code=\"e\">Complément du titre</subfield>
+  </datafield>
+  <datafield tag=\"700\" ind1=\" \" ind2=\"1\">
+    <subfield code=\"a\">Demians</subfield>
+    <subfield code=\"b\">Frédéric</subfield>
+  </datafield>
+</record>");
+        let format = Format::Marcxml;
+        match format.deserialize(xml.as_bytes()) {
+            Ok(record) => {
+                let expected = String::from(EXPECTED_DEFAULT_RECORD);
+                assert_eq!(record.to_string(), expected);
+            },
+            Err(e) => println!("{e}"),
+        };
     }
 
     #[test]
@@ -633,11 +736,6 @@ mod tests {
 610    $a Sujet 1
 610    $a Sujet 2");
         assert_eq!(text, expected);
-    }
-
-    #[test]
-    fn marc_reader() {
-        let format = Format::Iso2709;
     }
 
 }
