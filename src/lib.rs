@@ -1,6 +1,6 @@
 use std::fmt;
 use std::str;
-use std::io::{ Write, Read, BufRead };
+use std::io::{Write, Read, BufRead};
 use quick_xml::events::{BytesText, Event};
 use quick_xml::writer::Writer as XmlWriter;
 use quick_xml::reader::Reader as XmlReader;
@@ -295,7 +295,6 @@ impl Format {
     pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
         let cursor = std::io::Cursor::new(Vec::new());
         let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
-        println!("on y est");
         match xml_writer
             .create_element("record")
             .write_inner_content(|writer| {
