@@ -75,6 +75,17 @@ impl fmt::Display for Record {
     }
 }
 
+impl Default for Record {
+    fn default() -> Self {
+        let leader: [u8; 24] = DEFAULT_LEADER;
+        let fields: Vec<Field> = Vec::new();
+        Self {
+            leader,
+            fields,
+        }
+    }
+}
+
 impl Record {
     pub fn add(&mut self, field: Field) {
         let tag = field.tag();
@@ -86,15 +97,6 @@ impl Record {
 
     pub fn new(fields: Vec<Field>) -> Self {
         let leader: [u8; 24] = DEFAULT_LEADER;
-        Self {
-            leader,
-            fields,
-        }
-    }
-
-    pub fn new_empty() -> Self {
-        let leader: [u8; 24] = DEFAULT_LEADER;
-        let fields: Vec<Field> = Vec::new();
         Self {
             leader,
             fields,
@@ -275,6 +277,7 @@ impl Format {
                         }
                         let slice = &octets[j..k];
                         let value = String::from_utf8(slice.to_vec())?;
+                        // let value: String = unsafe { String::from_utf8_unchecked(slice.to_vec()) };
                         j = k;
                         subfields.push(Subfield(letter, value));
                     }
@@ -344,13 +347,13 @@ impl Format {
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         let xml: &str = unsafe { str::from_utf8_unchecked(octets) };
         let mut reader = XmlReader::from_str(xml);
-        let mut record = Record::new_empty();
+        let mut record = Record::default();
         let mut field: Option<Field> = None;
         let mut buf = Vec::new();
         loop {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(e) if e.name().as_ref() == b"record" => {
-                    record = Record::new_empty();
+                    record = Record::default()
                 }
                 Event::Start(e) if e.name().as_ref() == b"leader" => {
                     let contenu = reader.read_text(e.name())?.decode()?.to_string();
@@ -715,7 +718,7 @@ mod tests {
 
     #[test]
     fn record_insert() {
-        let mut record = Record::new_empty();
+        let mut record = Record::default();
         record.insert(vec![
             vec!["200", "  ", "a", "Mon titre", "b", "Texte imprimé", "e", "Complément"],
             vec!["010", "  ", "a", "9782070368228"],
