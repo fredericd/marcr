@@ -5,3 +5,12 @@ edition = "2024"
 
 [dependencies]
 quick-xml = "0.41"
+memchr = "2.7"
+clap = { version = "4.6.6", features = ["derive"] }
+
+[profile.release]
+opt-level = "z"     # Optimise pour la taille ("z" ou "s") au lieu de la vitesse pure ("3")
+lto = true          # Link-Time Optimization : élimine le code mort à travers toutes les crates
+codegen-units = 1   # Réduit le parallélisme de compilation pour maximiser l'optimisation
+panic = "abort"     # Supprime le mécanisme de déroulement de pile (unwind) en cas de panic
+strip = true        # Retire tous les symboles de débogage du binaire final
