@@ -248,19 +248,19 @@ impl Format {
             let mut text = std::str::from_utf8(&octets[directory_offset..directory_offset+3])?;
             let tag: u16 = match text.parse::<u16>() {
                 Ok(tag) => tag,
-                Err(_) => return Err("Bad ISO2709, tag non numérique".into()),
+                Err(_) => return Err("Bad ISO2709, invalid tag".into()),
             };
             text = std::str::from_utf8(&octets[directory_offset+3..directory_offset+3+4])?;
             let len: usize = match text.parse::<usize>() {
                 Ok(len) => len - 1,
-                Err(_) => return Err("Bad ISO2709, length non numérique".into()),
+                Err(_) => return Err("Bad ISO2709, length non digit".into()),
             };
             text = std::str::from_utf8(&octets[directory_offset+3+4..directory_offset+3+4+5])?;
             let offset: usize = text.parse::<usize>().unwrap();
             let base = directory_len + offset;
             if tag < 10 {
                 let slice = &octets[base..base + len];
-                let value = String::from_utf8(slice.to_vec())?;
+                let value = String::from_utf8_lossy(slice).into_owned();
                 fields.push(Field::Control(tag, value));
             } else {
                 let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
@@ -276,8 +276,7 @@ impl Format {
                             k += 1;
                         }
                         let slice = &octets[j..k];
-                        let value = String::from_utf8(slice.to_vec())?;
-                        // let value: String = unsafe { String::from_utf8_unchecked(slice.to_vec()) };
+                        let value = String::from_utf8_lossy(slice).into_owned();
                         j = k;
                         subfields.push(Subfield(letter, value));
                     }
