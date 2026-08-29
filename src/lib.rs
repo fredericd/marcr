@@ -265,7 +265,7 @@ impl Format {
             } else {
                 let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
                 let mut j = base + 2;
-                let mut subfields: Vec<Subfield> = Vec::with_capacity(5);
+                let mut subfields: Vec<Subfield> = Vec::with_capacity(3);
                 while j < base + len {
                     if octets[j] == DE {
                         j += 1;
