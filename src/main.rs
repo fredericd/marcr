@@ -28,11 +28,11 @@ impl fmt::Display for ArgFormat {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Format of the input files: iso2709, marcxml.
+    /// Format of the input files
     #[arg(short, long, value_name = "FORMAT", default_value_t = ArgFormat::Iso2709)]
     deserialize: ArgFormat,
 
-    /// Format of the output file: iso2709, marxml, text.
+    /// Format of the output file
     #[arg(short, long, value_name = "FORMAT", default_value_t = ArgFormat::Text)]
     serialize: ArgFormat,
 
