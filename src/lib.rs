@@ -10,6 +10,8 @@ const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
 const DE: u8 = 0x1f; // Delimiter
 const DEFAULT_LEADER: [u8; 24] = *b"00000nam a2200000   4500";
+const XML_START_TAG: &[u8] = b"<record>";
+const XML_END_TAG: &[u8] = b"</record>";
 
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
@@ -493,26 +495,28 @@ impl Format {
 pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
+    pub buffer: Vec<u8>,   // Reusable internal buffer
     pub count: usize,
 }
 
 impl<R: Read + BufRead> Reader<R> {
     pub fn new(format: Format, reader: R) -> Self {
+        let buffer: Vec<u8> = Vec::new();
         let count = 0;
-        Self { format, reader, count }
+        Self { format, reader, buffer, count }
     }
 
     pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
-            Format::Marcxml => return Err("Pas de parser pour Marcxml".into()),
+            Format::Marcxml => self.read_marcxml(),
             Format::Text    => return Err("Pas de parser pour Text".into()),
         }
     }
 
     pub fn read_iso2709(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         // Tampon de secours uniquement pour les notices plus grandes que la taille du BufReader
-        let mut scratch = Vec::new();
+        self.buffer.clear();
         let mut found = false;
         let mut option_record: Option<Record> = None;
         while !found {
@@ -523,22 +527,83 @@ impl<R: Read + BufRead> Reader<R> {
             }
             let consumed = {
                 if let Some(pos) = memchr(RT, available) {
-                    if scratch.is_empty() {
-                        // Found in reader buffer. No need to use scratch, ie zero-copy
+                    if self.buffer.is_empty() {
+                        // Found in reader buffer. No need to use an internal buffer, ie zero-copy
                         let octets = &available[..=pos];
                         option_record = Some(self.format.deserialize(octets)?);
                     } else {
                         // Found a record which was extended on several reader buffer
-                        scratch.extend_from_slice(&available[..=pos]);
-                        option_record = Some(self.format.deserialize(&scratch)?);
+                        self.buffer.extend_from_slice(&available[..=pos]);
+                        option_record = Some(self.format.deserialize(&self.buffer)?);
                     }
                     found = true;
                     pos + 1
                 } else {
-                    scratch.extend_from_slice(available);
+                    self.buffer.extend_from_slice(available);
                     available.len()
                 }
             };
+            self.reader.consume(consumed);
+        }
+        Ok(option_record)
+    }
+
+    pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+        self.buffer.clear();
+        let mut found = false;
+        let mut matched_start = 0;
+        let mut in_record = false;
+        let mut matched_end = 0;
+        let mut option_record: Option<Record> = None;
+
+        while !found {
+            // 1. Accès direct au tampon mémoire du BufReader
+            let available = self.reader.fill_buf()?;
+            if available.is_empty() {
+                break; // Fin de fichier propre
+            }
+
+            let mut consumed = 0;
+
+            if !in_record {
+                // PHASE 1 : Recherche de <record>
+                for &b in available {
+                    consumed += 1;
+                    if b == XML_START_TAG[matched_start] {
+                        matched_start += 1;
+                        if matched_start == XML_START_TAG.len() {
+                            in_record = true;
+                            self.buffer.extend_from_slice(XML_START_TAG);
+                            break;
+                        }
+                    } else if b == XML_START_TAG[0] {
+                        matched_start = 1;
+                    } else {
+                        matched_start = 0;
+                    }
+                }
+            } else {
+                // PHASE 2 : Capture du contenu jusqu'à </record>
+                for &b in available {
+                    consumed += 1;
+                    self.buffer.push(b);
+
+                    if b == XML_END_TAG[matched_end] {
+                        matched_end += 1;
+                        if matched_end == XML_END_TAG.len() {
+                            found = true;
+                            option_record = Some(self.format.deserialize(&self.buffer)?);
+                            break;
+                        }
+                    } else if b == XML_END_TAG[0] {
+                        matched_end = 1;
+                    } else {
+                        matched_end = 0;
+                    }
+                }
+            }
+
+            // 2. Informe le BufReader qu'on a traité `consumed` octets
             self.reader.consume(consumed);
         }
         Ok(option_record)
