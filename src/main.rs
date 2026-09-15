@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         let stdin = io::stdin();
         let buf_reader: Box<dyn BufRead> = Box::new(BufReader::with_capacity(128 * 1024, stdin.lock()));
-        let reader = Reader::new(get_format(args.serialize), buf_reader);
+        let reader = Reader::new(get_format(args.deserialize), buf_reader);
         write_to(reader, &mut writer)?;
     }
 
