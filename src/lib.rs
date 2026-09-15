@@ -197,42 +197,40 @@ impl Format {
 
     pub fn serialize_iso2709(&self, record: &Record) -> Vec<u8> {
         let mut fields: Vec<u8> = Vec::new();
-        let mut directory: Vec<u8> = Vec::new();
+        let mut directory: Vec<u8> = Vec::with_capacity(record.fields.len() * 12 + 1);
         let mut from = 0;
         for field in record.fields.iter() {
-            let mut data: Vec<u8> = Vec::with_capacity(2000);
+            let start = fields.len();
             let tag = match field {
                 Field::Control(tag, value) => {
-                    data.extend_from_slice(value.as_bytes());
+                    fields.extend_from_slice(value.as_bytes());
                     tag
                 },
                 Field::Standard(tag, ind, subfields) => {
-                    data.push(ind[0] as u8);
-                    data.push(ind[1] as u8);
+                    fields.push(ind[0] as u8);
+                    fields.push(ind[1] as u8);
                     for Subfield(letter, value) in subfields {
-                        data.push(DE);
-                        data.push(*letter as u8);
-                        data.extend_from_slice(value.as_bytes());
+                        fields.push(DE);
+                        fields.push(*letter as u8);
+                        fields.extend_from_slice(value.as_bytes());
                     }
                     tag
                 }
             };
-            data.push(FT);
-            let len = data.len();
-            directory.extend_from_slice(format!("{tag:03}").as_bytes());
-            directory.extend_from_slice(format!("{len:04}").as_bytes());
-            directory.extend_from_slice(format!("{from:05}").as_bytes());
-            from = from + len;
-            fields.append(&mut data);
+            fields.push(FT);
+            let len = fields.len() - start;
+            write!(directory, "{tag:03}{len:04}{from:05}").unwrap();
+            from += len;
         }
         let offset = 24 + 12 * record.fields.len() + 1;
         let length = offset + from + 1;
         let mut leader = record.leader;
-        leader[..5].copy_from_slice(format!("{length:05}").as_bytes());
-        leader[12..17].copy_from_slice(format!("{offset:05}").as_bytes());
+        write!(&mut leader[..5], "{length:05}").unwrap();
+        write!(&mut leader[12..17], "{offset:05}").unwrap();
         directory.push(FT);
         fields.push(RT);
-        let mut data: Vec<u8> = leader.to_vec();
+        let mut data: Vec<u8> = Vec::with_capacity(leader.len() + directory.len() + fields.len());
+        data.extend_from_slice(&leader);
         data.extend_from_slice(&directory);
         data.extend_from_slice(&fields);
         data
