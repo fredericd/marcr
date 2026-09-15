@@ -4,7 +4,7 @@ use std::io::{Write, Read, BufRead};
 use quick_xml::events::{BytesText, Event};
 use quick_xml::writer::Writer as XmlWriter;
 use quick_xml::reader::Reader as XmlReader;
-use memchr::memchr;
+use memchr::{memchr, memchr2};
 
 const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
@@ -12,6 +12,17 @@ const DE: u8 = 0x1f; // Delimiter
 const DEFAULT_LEADER: [u8; 24] = *b"00000nam a2200000   4500";
 const XML_START_TAG: &[u8] = b"<record>";
 const XML_END_TAG: &[u8] = b"</record>";
+
+/// Parse un nombre décimal ASCII de largeur fixe (répertoire ISO2709), sans
+/// passer par la validation UTF-8 générique + FromStr de `str::parse`.
+fn parse_digits(bytes: &[u8]) -> Option<usize> {
+    let mut n: usize = 0;
+    for &b in bytes {
+        if !b.is_ascii_digit() { return None; }
+        n = n * 10 + (b - b'0') as usize;
+    }
+    Some(n)
+}
 
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
@@ -239,24 +250,19 @@ impl Format {
     pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
         let leader: [u8; 24] = octets[..24].try_into().unwrap();
-        let text = std::str::from_utf8(&octets[12..17])?;
-        let directory_len: usize = text.parse::<usize>().unwrap();
+        let directory_len = parse_digits(&octets[12..17])
+            .ok_or("Bad ISO2709, invalid leader length")?;
         let number_of_tags = (directory_len - 24 - 1) / 12;
         let mut fields: Vec<Field> = Vec::with_capacity(number_of_tags);
         for i in 0..number_of_tags {
             let directory_offset = 24 + i * 12;
-            let mut text = std::str::from_utf8(&octets[directory_offset..directory_offset+3])?;
-            let tag: u16 = match text.parse::<u16>() {
-                Ok(tag) => tag,
-                Err(_) => return Err("Bad ISO2709, invalid tag".into()),
-            };
-            text = std::str::from_utf8(&octets[directory_offset+3..directory_offset+3+4])?;
-            let len: usize = match text.parse::<usize>() {
-                Ok(len) => len - 1,
-                Err(_) => return Err("Bad ISO2709, length non digit".into()),
-            };
-            text = std::str::from_utf8(&octets[directory_offset+3+4..directory_offset+3+4+5])?;
-            let offset: usize = text.parse::<usize>().unwrap();
+            let tag: u16 = parse_digits(&octets[directory_offset..directory_offset+3])
+                .and_then(|t| u16::try_from(t).ok())
+                .ok_or("Bad ISO2709, invalid tag")?;
+            let len: usize = parse_digits(&octets[directory_offset+3..directory_offset+3+4])
+                .ok_or("Bad ISO2709, length non digit")? - 1;
+            let offset: usize = parse_digits(&octets[directory_offset+3+4..directory_offset+3+4+5])
+                .ok_or("Bad ISO2709, invalid offset")?;
             let base = directory_len + offset;
             if tag < 10 {
                 let slice = &octets[base..base + len];
@@ -265,16 +271,19 @@ impl Format {
             } else {
                 let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
                 let mut j = base + 2;
+                let field_end = base + len;
+                // +1 : la borne inclut l'octet FT qui termine le dernier sous-champ
+                // (exclu de `field_end`, qui sert à arrêter la boucle *avant* ce FT).
+                let scan_end = field_end + 1;
                 let mut subfields: Vec<Subfield> = Vec::with_capacity(3);
-                while j < base + len {
+                while j < field_end {
                     if octets[j] == DE {
                         j += 1;
                         let letter: char = octets[j] as char;
                         j += 1;
-                        let mut k = j;
-                        while !(octets[k] == DE || octets[k] == FT) {
-                            k += 1;
-                        }
+                        let k = memchr2(DE, FT, &octets[j..scan_end])
+                            .map(|p| j + p)
+                            .ok_or("Bad ISO2709, subfield not terminated")?;
                         let slice = &octets[j..k];
                         let value = String::from_utf8_lossy(slice).into_owned();
                         j = k;
