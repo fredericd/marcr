@@ -10,7 +10,7 @@ const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
 const DE: u8 = 0x1f; // Delimiter
 const DEFAULT_LEADER: [u8; 24] = *b"00000nam a2200000   4500";
-const XML_START_TAG: &[u8] = b"<record>";
+const XML_START_PREFIX: &[u8] = b"<record"; // sans '>' : la balise peut porter des attributs (xmlns, ...)
 const XML_END_TAG: &[u8] = b"</record>";
 
 /// Parse un nombre décimal ASCII de largeur fixe (répertoire ISO2709), sans
@@ -558,10 +558,16 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
-        let mut matched_start = 0;
-        let mut in_record = false;
-        let mut matched_end = 0;
         let mut option_record: Option<Record> = None;
+
+        // Repérage de <record> : on matche le préfixe "<record", puis on
+        // vérifie que l'octet suivant est bien une limite de nom de balise
+        // (espace/tab/EOL ou '>'), afin d'accepter <record>, <record ...>
+        // ou <record xmlns="...">, sans matcher par erreur <records>.
+        enum State { Searching, OpenTag, Content }
+        let mut state = State::Searching;
+        let mut matched_start = 0; // progression dans XML_START_PREFIX
+        let mut matched_end = 0;   // progression dans XML_END_TAG
 
         while !found {
             // 1. Accès direct au tampon mémoire du BufReader
@@ -571,42 +577,51 @@ impl<R: Read + BufRead> Reader<R> {
             }
 
             let mut consumed = 0;
-
-            if !in_record {
-                // PHASE 1 : Recherche de <record>
-                for &b in available {
-                    consumed += 1;
-                    if b == XML_START_TAG[matched_start] {
-                        matched_start += 1;
-                        if matched_start == XML_START_TAG.len() {
-                            in_record = true;
-                            self.buffer.extend_from_slice(XML_START_TAG);
-                            break;
+            for &b in available {
+                consumed += 1;
+                match state {
+                    State::Searching => {
+                        if b == XML_START_PREFIX[matched_start] {
+                            matched_start += 1;
+                            if matched_start == XML_START_PREFIX.len() {
+                                self.buffer.extend_from_slice(XML_START_PREFIX);
+                                state = State::OpenTag;
+                            }
+                        } else if b == XML_START_PREFIX[0] {
+                            matched_start = 1;
+                        } else {
+                            matched_start = 0;
                         }
-                    } else if b == XML_START_TAG[0] {
-                        matched_start = 1;
-                    } else {
-                        matched_start = 0;
-                    }
-                }
-            } else {
-                // PHASE 2 : Capture du contenu jusqu'à </record>
-                for &b in available {
-                    consumed += 1;
-                    self.buffer.push(b);
-
-                    if b == XML_END_TAG[matched_end] {
-                        matched_end += 1;
-                        if matched_end == XML_END_TAG.len() {
-                            found = true;
-                            option_record = Some(self.format.deserialize(&self.buffer)?);
-                            break;
+                    },
+                    State::OpenTag => {
+                        if self.buffer.len() == XML_START_PREFIX.len() && !(b.is_ascii_whitespace() || b == b'>') {
+                            // Faux positif (ex: "<records") : on annule et on
+                            // reprend la recherche à partir de cet octet.
+                            self.buffer.clear();
+                            state = State::Searching;
+                            matched_start = if b == XML_START_PREFIX[0] { 1 } else { 0 };
+                            continue;
                         }
-                    } else if b == XML_END_TAG[0] {
-                        matched_end = 1;
-                    } else {
-                        matched_end = 0;
-                    }
+                        self.buffer.push(b);
+                        if b == b'>' {
+                            state = State::Content;
+                        }
+                    },
+                    State::Content => {
+                        self.buffer.push(b);
+                        if b == XML_END_TAG[matched_end] {
+                            matched_end += 1;
+                            if matched_end == XML_END_TAG.len() {
+                                found = true;
+                                option_record = Some(self.format.deserialize(&self.buffer)?);
+                                break;
+                            }
+                        } else if b == XML_END_TAG[0] {
+                            matched_end = 1;
+                        } else {
+                            matched_end = 0;
+                        }
+                    },
                 }
             }
 
