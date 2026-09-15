@@ -15,3 +15,8 @@ lto = true          # Link-Time Optimization : élimine le code mort à travers 
 codegen-units = 1   # Réduit le parallélisme de compilation pour maximiser l'optimisation
 panic = "abort"     # Supprime le mécanisme de déroulement de pile (unwind) en cas de panic
 strip = true        # Retire tous les symboles de débogage du binaire final
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+tempfile = "3.27.0"

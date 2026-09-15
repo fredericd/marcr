@@ -1,0 +1,246 @@
+<collection xmlns="http://www.loc.gov/MARC21/slim">
+<record>
+  <leader>01283cas a2200349   4500</leader>
+  <controlfield tag="001">1</controlfield>
+  <controlfield tag="003">http://catalogue.bnf.fr/ark:/12148/cb39257606d</controlfield>
+  <datafield tag="011" ind1="1" ind2=" ">
+    <subfield code="a">1770-0191</subfield>
+    <subfield code="f">1770-0191</subfield>
+    <subfield code="d">le n&#xB0;  3,90 EUR</subfield>
+    <subfield code="d">abonn. 13 EUR</subfield>
+  </datafield>
+  <datafield tag="020" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">10405008</subfield>
+  </datafield>
+  <datafield tag="021" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">DLP 2004</subfield>
+  </datafield>
+  <datafield tag="090" ind1=" " ind2=" ">
+    <subfield code="a">1</subfield>
+  </datafield>
+  <datafield tag="100" ind1=" " ind2=" ">
+    <subfield code="a">20041015u2004    m  y0frey50      ba</subfield>
+  </datafield>
+  <datafield tag="101" ind1="0" ind2=" ">
+    <subfield code="a">fre</subfield>
+  </datafield>
+  <datafield tag="102" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+  </datafield>
+  <datafield tag="106" ind1=" " ind2=" ">
+    <subfield code="a">r</subfield>
+  </datafield>
+  <datafield tag="110" ind1=" " ind2=" ">
+    <subfield code="a">mh|z|||||||</subfield>
+  </datafield>
+  <datafield tag="181" ind1=" " ind2="0">
+    <subfield code="6">01</subfield>
+    <subfield code="a">i </subfield>
+    <subfield code="b">xxxe  </subfield>
+  </datafield>
+  <datafield tag="181" ind1=" " ind2=" ">
+    <subfield code="6">02</subfield>
+    <subfield code="c">txt</subfield>
+    <subfield code="2">rdacontent</subfield>
+  </datafield>
+  <datafield tag="182" ind1=" " ind2="0">
+    <subfield code="6">01</subfield>
+    <subfield code="a">n</subfield>
+  </datafield>
+  <datafield tag="182" ind1=" " ind2=" ">
+    <subfield code="6">02</subfield>
+    <subfield code="c">n</subfield>
+    <subfield code="2">rdamedia</subfield>
+  </datafield>
+  <datafield tag="200" ind1="1" ind2=" ">
+    <subfield code="a">Le Temps de vivre</subfield>
+    <subfield code="b">Texte imprim&#xE9;</subfield>
+    <subfield code="f">[dir. publ. Carole Hamecher-Benhamou]</subfield>
+  </datafield>
+  <datafield tag="207" ind1=" " ind2="0">
+    <subfield code="a">N&#xB0;  1(2004,juil./sept.)</subfield>
+  </datafield>
+  <datafield tag="210" ind1=" " ind2=" ">
+    <subfield code="a">Lacourt-Saint-Pierre</subfield>
+    <subfield code="b">867 chemin de Noalhac ; 82290</subfield>
+    <subfield code="c">Groupe Hugo &#xE9;d.</subfield>
+    <subfield code="d">2004-</subfield>
+  </datafield>
+  <datafield tag="215" ind1=" " ind2=" ">
+    <subfield code="d">30 cm</subfield>
+  </datafield>
+  <datafield tag="300" ind1=" " ind2=" ">
+    <subfield code="a">Dernier num&#xE9;ro re&#xE7;u au titre du d&#xE9;p&#xF4;t l&#xE9;gal : n&#xB0; 3 (2005)</subfield>
+  </datafield>
+  <datafield tag="326" ind1=" " ind2=" ">
+    <subfield code="a">Trimestriel</subfield>
+  </datafield>
+  <datafield tag="530" ind1="1" ind2=" ">
+    <subfield code="a">Le Temps de vivre</subfield>
+    <subfield code="b">Lacourt-Saint-Pierre</subfield>
+  </datafield>
+  <datafield tag="676" ind1=" " ind2=" ">
+    <subfield code="a">054.108 46</subfield>
+    <subfield code="v">23</subfield>
+  </datafield>
+  <datafield tag="686" ind1=" " ind2=" ">
+    <subfield code="a">071</subfield>
+    <subfield code="2">Cadre de classement de la Bibliographie nationale fran&#xE7;aise</subfield>
+  </datafield>
+  <datafield tag="801" ind1=" " ind2="0">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">FR-751131015</subfield>
+    <subfield code="c">20041015</subfield>
+    <subfield code="g">AFNOR</subfield>
+    <subfield code="h">FRBNF392576060000001</subfield>
+    <subfield code="2">intermrc</subfield>
+  </datafield>
+  <datafield tag="802" ind1=" " ind2=" ">
+    <subfield code="a">07</subfield>
+  </datafield>
+  <datafield tag="995" ind1=" " ind2=" ">
+    <subfield code="0">0</subfield>
+    <subfield code="1">0</subfield>
+    <subfield code="2">0</subfield>
+    <subfield code="5">2022-08-05</subfield>
+    <subfield code="9">1</subfield>
+    <subfield code="b">TAMIL</subfield>
+    <subfield code="c">TAMIL</subfield>
+    <subfield code="e">GEN</subfield>
+    <subfield code="f">1000000</subfield>
+    <subfield code="i">2022-08-05</subfield>
+    <subfield code="k">054.108 46</subfield>
+    <subfield code="o">0</subfield>
+    <subfield code="r">PERI</subfield>
+    <subfield code="s">054_108000000000000_46</subfield>
+    <subfield code="w">0</subfield>
+    <subfield code="y">2022-08-05 00:00:00</subfield>
+  </datafield>
+</record>
+<record>
+  <leader>01560cas a2200361   4500</leader>
+  <controlfield tag="001">2</controlfield>
+  <controlfield tag="003">http://catalogue.bnf.fr/ark:/12148/cb39257752v</controlfield>
+  <datafield tag="011" ind1="1" ind2=" ">
+    <subfield code="a">1770-0205</subfield>
+    <subfield code="f">1770-0205</subfield>
+  </datafield>
+  <datafield tag="020" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">10405559</subfield>
+  </datafield>
+  <datafield tag="021" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">DLP 2004</subfield>
+  </datafield>
+  <datafield tag="090" ind1=" " ind2=" ">
+    <subfield code="a">2</subfield>
+  </datafield>
+  <datafield tag="100" ind1=" " ind2=" ">
+    <subfield code="a">20041015b200?2013m  y0frey50      ba</subfield>
+  </datafield>
+  <datafield tag="101" ind1="0" ind2=" ">
+    <subfield code="a">fre</subfield>
+  </datafield>
+  <datafield tag="102" ind1=" " ind2=" ">
+    <subfield code="a">FR</subfield>
+  </datafield>
+  <datafield tag="106" ind1=" " ind2=" ">
+    <subfield code="a">r</subfield>
+  </datafield>
+  <datafield tag="110" ind1=" " ind2=" ">
+    <subfield code="a">nu|z0||||||</subfield>
+  </datafield>
+  <datafield tag="181" ind1=" " ind2="0">
+    <subfield code="6">01</subfield>
+    <subfield code="a">i </subfield>
+    <subfield code="b">xxxe  </subfield>
+  </datafield>
+  <datafield tag="181" ind1=" " ind2=" ">
+    <subfield code="6">02</subfield>
+    <subfield code="c">txt</subfield>
+    <subfield code="2">rdacontent</subfield>
+  </datafield>
+  <datafield tag="182" ind1=" " ind2="0">
+    <subfield code="6">01</subfield>
+    <subfield code="a">n</subfield>
+  </datafield>
+  <datafield tag="182" ind1=" " ind2=" ">
+    <subfield code="6">02</subfield>
+    <subfield code="c">n</subfield>
+    <subfield code="2">rdamedia</subfield>
+  </datafield>
+  <datafield tag="200" ind1="1" ind2=" ">
+    <subfield code="a">Bulletin acad&#xE9;mique du Syndicat national des coll&#xE8;ges et des lyc&#xE9;es</subfield>
+    <subfield code="b">Texte imprim&#xE9;</subfield>
+    <subfield code="f">Syndicat national des coll&#xE8;ges et des lyc&#xE9;es, Acad&#xE9;mie de Strasbourg</subfield>
+  </datafield>
+  <datafield tag="210" ind1=" " ind2=" ">
+    <subfield code="a">Fegersheim</subfield>
+    <subfield code="b">15 rue de Cressier ; 67640</subfield>
+    <subfield code="c">SNCL FAEN Acad&#xE9;mie de Strasbourg</subfield>
+    <subfield code="d">[200?]-2013</subfield>
+  </datafield>
+  <datafield tag="215" ind1=" " ind2=" ">
+    <subfield code="d">22 cm</subfield>
+  </datafield>
+  <datafield tag="300" ind1=" " ind2=" ">
+    <subfield code="a">Notice r&#xE9;d. d&#x27;apr&#xE8;s le n&#xB0; 38 (2004, juil./ao&#xFB;t)</subfield>
+  </datafield>
+  <datafield tag="300" ind1=" " ind2=" ">
+    <subfield code="a">Dernier n&#xB0; paru : n&#xB0; 89 (2013, mars/avril)</subfield>
+  </datafield>
+  <datafield tag="306" ind1=" " ind2=" ">
+    <subfield code="a">FAEN = F&#xE9;d&#xE9;ration autonome de l&#x27;Education nationale</subfield>
+  </datafield>
+  <datafield tag="530" ind1="0" ind2=" ">
+    <subfield code="a">Bulletin acad&#xE9;mique du Syndicat national des coll&#xE8;ges et des lyc&#xE9;es</subfield>
+  </datafield>
+  <datafield tag="676" ind1=" " ind2=" ">
+    <subfield code="a">331.881 137094439</subfield>
+    <subfield code="v">23</subfield>
+  </datafield>
+  <datafield tag="686" ind1=" " ind2=" ">
+    <subfield code="a">331</subfield>
+    <subfield code="2">Cadre de classement de la Bibliographie nationale fran&#xE7;aise</subfield>
+  </datafield>
+  <datafield tag="710" ind1=" " ind2=" ">
+    <subfield code="3">13205939</subfield>
+    <subfield code="a">Syndicat national des coll&#xE8;ges et des lyc&#xE9;es</subfield>
+    <subfield code="c">France</subfield>
+    <subfield code="b">Section acad&#xE9;mique (Strasbourg</subfield>
+    <subfield code="4">070</subfield>
+  </datafield>
+  <datafield tag="801" ind1=" " ind2="0">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">FR-751131015</subfield>
+    <subfield code="c">20041015</subfield>
+    <subfield code="g">AFNOR</subfield>
+    <subfield code="h">FRBNF39257752000000X</subfield>
+    <subfield code="2">intermrc</subfield>
+  </datafield>
+  <datafield tag="802" ind1=" " ind2=" ">
+    <subfield code="a">07</subfield>
+  </datafield>
+  <datafield tag="995" ind1=" " ind2=" ">
+    <subfield code="0">0</subfield>
+    <subfield code="1">0</subfield>
+    <subfield code="2">0</subfield>
+    <subfield code="5">2022-08-05</subfield>
+    <subfield code="9">2</subfield>
+    <subfield code="b">TAMIL</subfield>
+    <subfield code="c">TAMIL</subfield>
+    <subfield code="e">GEN</subfield>
+    <subfield code="f">1000001</subfield>
+    <subfield code="i">2022-08-05</subfield>
+    <subfield code="k">331.881 137094439</subfield>
+    <subfield code="o">0</subfield>
+    <subfield code="r">PERI</subfield>
+    <subfield code="s">331_881000000000000_137094439</subfield>
+    <subfield code="w">0</subfield>
+    <subfield code="y">2022-08-05 00:00:00</subfield>
+  </datafield>
+</record>
+</collection>
