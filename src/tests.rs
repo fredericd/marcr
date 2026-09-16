@@ -71,41 +71,41 @@ fn text_writer() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn text_reader() {
     let record = Format::Text.deserialize(EXPECTED_DEFAULT_RECORD.as_bytes())
-        .expect("La désérialisation texte a échoué");
+        .expect("Text deserialization failed");
     assert_eq!(record.to_string(), EXPECTED_DEFAULT_RECORD);
 }
 
 #[test]
 fn text_reader_control_field_single_space_separator() {
-    // Cas signalé : un champ de contrôle avec une valeur très courte,
-    // ex. "001 2", ne doit pas être rejeté par une longueur minimale
-    // pensée pour les champs standard (qui ont des indicateurs).
+    // Reported case: a control field with a very short value, e.g.
+    // "001 2", must not be rejected by a minimum length meant for
+    // standard fields (which have indicators).
     let text = "00000nam a2200000   4500\n001 2";
     let record = Format::Text.deserialize(text.as_bytes())
-        .expect("La désérialisation texte a échoué");
+        .expect("Text deserialization failed");
     match &record.fields[0] {
         Field::Control(tag, value) => {
             assert_eq!(*tag, 1);
             assert_eq!(value, "2");
         },
-        other => panic!("Champ de contrôle attendu, obtenu {other:?}"),
+        other => panic!("Expected a control field, got {other:?}"),
     }
 }
 
 #[test]
 fn text_roundtrip() {
-    // serialize_text() puis deserialize_text() doit redonner la même notice.
+    // serialize_text() then deserialize_text() should yield the same record.
     let record = get_default_record();
     let octets = Format::Text.serialize(&record);
     let parsed = Format::Text.deserialize(&octets)
-        .expect("La désérialisation texte a échoué");
+        .expect("Text deserialization failed");
     assert_eq!(parsed.to_string(), record.to_string());
 }
 
 #[test]
 fn text_reader_multi_record_stream() {
-    // Writer sépare les notices texte par une ligne vide ; Reader doit
-    // retrouver exactement les mêmes notices en sens inverse.
+    // Writer separates text records with a blank line; Reader must
+    // retrieve exactly the same records in reverse.
     let record = get_default_record();
     let mut writer = Writer::new(Format::Text, std::io::Cursor::new(Vec::new()));
     writer.write(&record).unwrap();
@@ -118,32 +118,32 @@ fn text_reader_multi_record_stream() {
     for _ in 0..2 {
         match reader.read() {
             Ok(Some(record)) => assert_eq!(record.to_string(), expected),
-            Ok(None) => panic!("Fin de flux prématurée"),
-            Err(e) => panic!("Erreur de lecture: {e}"),
+            Ok(None) => panic!("Premature end of stream"),
+            Err(e) => panic!("Read error: {e}"),
         }
     }
     match reader.read() {
         Ok(None) => (),
-        other => panic!("Attendu None en fin de flux, obtenu {other:?}"),
+        other => panic!("Expected None at end of stream, got {other:?}"),
     }
 }
 
 #[test]
 fn text_reader_empty_subfields() {
-    // Un champ standard sans sous-champ doit rester valide (indicateurs
-    // conservés, liste de sous-champs vide) : sérialiser puis déserialiser
-    // évite d'écrire à la main une chaîne fragile pleine d'espaces.
+    // A standard field with no subfield must remain valid (indicators
+    // kept, empty subfield list): serializing then deserializing avoids
+    // hand-writing a fragile string full of spaces.
     let record = Record::new(vec![Field::Standard(200, [' ', ' '], vec![])]);
     let octets = Format::Text.serialize(&record);
     let parsed = Format::Text.deserialize(&octets)
-        .expect("La désérialisation texte a échoué");
+        .expect("Text deserialization failed");
     match &parsed.fields[0] {
         Field::Standard(tag, ind, subfields) => {
             assert_eq!(*tag, 200);
             assert_eq!(*ind, [' ', ' ']);
             assert!(subfields.is_empty());
         },
-        other => panic!("Champ standard attendu, obtenu {other:?}"),
+        other => panic!("Expected a standard field, got {other:?}"),
     }
 }
 
@@ -209,8 +209,8 @@ fn marcxml_deserialize() {
 
 #[test]
 fn marcxml_reader_accepts_start_tag_with_attributes() {
-    // <record> peut porter des attributs (xmlns, ...) dans des exports
-    // réels ; le scanner ne doit pas exiger le littéral exact "<record>".
+    // <record> may carry attributes (xmlns, ...) in real-world exports;
+    // the scanner must not require the exact literal "<record>".
     let record_body = "
   <leader>00146nam a2200073   4500</leader>
   <controlfield tag=\"001\">000001</controlfield>
@@ -238,15 +238,15 @@ fn marcxml_reader_accepts_start_tag_with_attributes() {
     for _ in 0..2 {
         match reader.read() {
             Ok(Some(record)) => assert_eq!(record.to_string(), expected),
-            Ok(None) => panic!("Fin de flux prématurée"),
-            Err(e) => panic!("Erreur de lecture: {e}"),
+            Ok(None) => panic!("Premature end of stream"),
+            Err(e) => panic!("Read error: {e}"),
         }
     }
 }
 
 #[test]
 fn marcxml_reader_ignores_lookalike_tag() {
-    // <records> ne doit pas être confondu avec <record>.
+    // <records> must not be confused with <record>.
     let xml = "<records><record>
   <leader>00146nam a2200073   4500</leader>
   <controlfield tag=\"001\">000001</controlfield>
@@ -265,8 +265,8 @@ fn marcxml_reader_ignores_lookalike_tag() {
     let expected = String::from(EXPECTED_DEFAULT_RECORD);
     match reader.read() {
         Ok(Some(record)) => assert_eq!(record.to_string(), expected),
-        Ok(None) => panic!("Fin de flux prématurée"),
-        Err(e) => panic!("Erreur de lecture: {e}"),
+        Ok(None) => panic!("Premature end of stream"),
+        Err(e) => panic!("Read error: {e}"),
     }
 }
 

@@ -13,7 +13,7 @@ enum ArgFormat {
     Text,
 }
 
-// Implémentation rapide de Display pour débloquer default_value_t
+// Quick Display implementation to unlock default_value_t
 impl fmt::Display for ArgFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

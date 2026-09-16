@@ -1,78 +1,77 @@
 # marcr
 
-Bibliothèque et outil en ligne de commande Rust pour lire et écrire des
-notices bibliographiques MARC, avec conversion entre trois formats :
+Rust library and command-line tool to read and write MARC bibliographic
+records, converting between three formats:
 
-- **ISO 2709** (`iso2709`) — le format d'échange MARC binaire classique.
-- **MARCXML** (`marcxml`) — la représentation XML normalisée (Library of
-  Congress).
-- **Texte** (`text`) — une représentation lisible, une ligne par champ.
-  Ce format n'est disponible qu'en **sortie** (pas de parseur en entrée).
+- **ISO 2709** (`iso2709`) — the classic binary MARC exchange format.
+- **MARCXML** (`marcxml`) — the standardized XML representation (Library
+  of Congress).
+- **Text** (`text`) — a human-readable representation, one line per
+  field.
 
-## Compilation
+## Build
 
 ```sh
 cargo build --release
 ```
 
-Le binaire est produit dans `target/release/marcr`. Le profil `release`
-est réglé pour la vitesse d'exécution (`opt-level = 3`, LTO activé)
-plutôt que pour la taille du binaire, car l'outil est destiné à traiter
-des fichiers de plusieurs centaines de Mo à quelques Go.
+The binary is produced at `target/release/marcr`. The `release` profile
+is tuned for execution speed (`opt-level = 3`, LTO enabled) rather than
+binary size, since the tool is meant to process files from several
+hundred MB up to a few GB.
 
-## Utilisation en ligne de commande
+## Command-line usage
 
 ```
-marcr [OPTIONS] [FICHIERS]...
+marcr [OPTIONS] [FILES]...
 
 Options:
-  -d, --deserialize <FORMAT>  Format des fichiers d'entrée [défaut: iso2709]
-                              [valeurs possibles: iso2709, marcxml, text]
-  -s, --serialize <FORMAT>    Format du fichier de sortie [défaut: text]
-                              [valeurs possibles: iso2709, marcxml, text]
-  -o, --output <NOM>          Nom du fichier de sortie (sinon stdout)
-  -h, --help                  Affiche l'aide
-  -V, --version               Affiche la version
+  -d, --deserialize <FORMAT>  Format of the input files [default: iso2709]
+                              [possible values: iso2709, marcxml, text]
+  -s, --serialize <FORMAT>    Format of the output file [default: text]
+                              [possible values: iso2709, marcxml, text]
+  -o, --output <NAME>         Name of the output file (stdout otherwise)
+  -h, --help                  Print help
+  -V, --version                Print version
 ```
 
-Si aucun fichier n'est indiqué, `marcr` lit sur l'entrée standard. Quand
-plusieurs fichiers sont passés en argument, ils sont concaténés dans la
-sortie.
+If no file is given, `marcr` reads from standard input. When several
+files are passed as arguments, they are concatenated in the output.
 
-### Exemples
+### Examples
 
-Convertir un fichier ISO2709 en MARCXML :
+Convert an ISO2709 file to MARCXML:
 
 ```sh
 marcr -d iso2709 -s marcxml -o notices.xml notices.mrc
 ```
 
-Afficher en texte lisible le contenu d'un fichier MARCXML sur la sortie
-standard :
+Print the content of a MARCXML file as human-readable text on standard
+output:
 
 ```sh
 marcr -d marcxml -s text notices.xml
 ```
 
-Utilisation avec un pipe (entrée standard, format par défaut ISO2709) :
+Usage with a pipe (standard input, default ISO2709 format):
 
 ```sh
 cat notices.mrc | marcr -s marcxml > notices.xml
 ```
 
-Fusionner plusieurs fichiers ISO2709 en un seul :
+Merge several ISO2709 files into one:
 
 ```sh
-marcr -d iso2709 -s iso2709 -o fusion.mrc a.mrc b.mrc c.mrc
+marcr -d iso2709 -s iso2709 -o merged.mrc a.mrc b.mrc c.mrc
 ```
 
-## Utilisation en tant que bibliothèque
+## Library usage
 
 ```rust
 use marcr::{Format, Reader, Writer};
 use std::io::{BufReader, Cursor};
 
-let data: &[u8] = b"..."; // notices au format ISO2709
+let data: &[u8] = b"..."; // ISO2709-formatted records
 let mut reader = Reader::new(Format::Iso2709, BufReader::new(Cursor::new(data)));
 
 let mut writer = Writer::new(Format::Marcxml, std::io::stdout());
@@ -82,22 +81,28 @@ while let Some(record) = reader.read()? {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`Record` expose directement ses champs (`leader`, `fields`) ainsi que des
-méthodes utilitaires (`add`, `insert`) pour construire une notice par
-programme.
+`Record` directly exposes its fields (`leader`, `fields`) as well as
+utility methods (`add`, `insert`) to build a record programmatically.
 
 ## Tests
 
 ```sh
-cargo test --lib          # tests unitaires (src/tests.rs)
-cargo test --test cli     # tests d'intégration du binaire (tests/cli.rs)
+cargo test --lib          # library unit tests (src/tests.rs)
+cargo test --test cli     # binary integration tests (tests/cli.rs)
 ```
 
-## Structure du projet
+## Project structure
 
 ```
-src/lib.rs      Format (Iso2709/Marcxml/Text), Record, Reader, Writer
-src/tests.rs    Tests unitaires de la bibliothèque
-src/main.rs     Interface en ligne de commande (clap)
-tests/cli.rs    Tests d'intégration du binaire
+src/lib.rs           Crate doc, shared constants, module re-exports
+src/record.rs         Subfield, Field, Record
+src/format/mod.rs     Format enum, RWDescription, serialize/deserialize dispatch
+src/format/iso2709.rs ISO 2709 (de)serialization
+src/format/marcxml.rs MARCXML (de)serialization
+src/format/text.rs    Text format (de)serialization
+src/reader.rs         Reader
+src/writer.rs         Writer
+src/tests.rs          Library unit tests
+src/main.rs           Command-line interface (clap)
+tests/cli.rs          Binary integration tests
 ```

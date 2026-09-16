@@ -4,12 +4,12 @@ use memchr::memchr;
 
 use crate::{Format, Record, RT, XML_END_TAG, XML_START_PREFIX};
 
-/// Lit des notices en série depuis un flux `R`, dans un format donné.
+/// Reads records in sequence from a stream `R`, in a given format.
 ///
-/// Chaque appel à [`Reader::read`] extrait et parse la notice suivante,
-/// sans avoir à charger tout le flux en mémoire. Pour `format: Text`, les
-/// notices doivent être séparées par une ligne vide (c'est ce que produit
-/// [`crate::Writer`] pour ce format).
+/// Each call to [`Reader::read`] extracts and parses the next record,
+/// without loading the whole stream into memory. For `format: Text`,
+/// records must be separated by a blank line (which is what
+/// [`crate::Writer`] produces for this format).
 pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
@@ -18,17 +18,17 @@ pub struct Reader<R> {
 }
 
 impl<R: Read + BufRead> Reader<R> {
-    /// Crée un lecteur pour `format` au-dessus du flux bufferisé `reader`.
+    /// Creates a reader for `format` on top of the buffered stream `reader`.
     pub fn new(format: Format, reader: R) -> Self {
         let buffer: Vec<u8> = Vec::new();
         let count = 0;
         Self { format, reader, buffer, count }
     }
 
-    /// Lit et parse la prochaine notice du flux.
+    /// Reads and parses the next record from the stream.
     ///
-    /// Retourne `Ok(None)` en fin de flux, `Err` en cas d'erreur de
-    /// lecture ou de notice mal formée.
+    /// Returns `Ok(None)` at end of stream, `Err` on a read error or a
+    /// malformed record.
     pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
@@ -37,11 +37,11 @@ impl<R: Read + BufRead> Reader<R> {
         }
     }
 
-    /// Lit la prochaine notice ISO 2709 : cherche l'octet RT (`0x1d`) qui
-    /// la termine dans le flux, en accumulant dans un tampon interne si
-    /// elle s'étend sur plusieurs lectures du `BufReader`.
+    /// Reads the next ISO 2709 record: looks for the RT byte (`0x1d`)
+    /// that terminates it in the stream, accumulating into an internal
+    /// buffer if it spans several `BufReader` reads.
     pub fn read_iso2709(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
-        // Tampon de secours uniquement pour les notices plus grandes que la taille du BufReader
+        // Fallback buffer, only for records larger than the BufReader's capacity
         self.buffer.clear();
         let mut found = false;
         let mut option_record: Option<Record> = None;
@@ -74,28 +74,28 @@ impl<R: Read + BufRead> Reader<R> {
         Ok(option_record)
     }
 
-    /// Lit la prochaine notice MARCXML : cherche l'élément `<record>`
-    /// suivant (avec ou sans attributs, ex. `xmlns="..."`) puis capture
-    /// jusqu'à `</record>` inclus.
+    /// Reads the next MARCXML record: looks for the next `<record>`
+    /// element (with or without attributes, e.g. `xmlns="..."`) then
+    /// captures up to and including `</record>`.
     pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
         let mut option_record: Option<Record> = None;
 
-        // Repérage de <record> : on matche le préfixe "<record", puis on
-        // vérifie que l'octet suivant est bien une limite de nom de balise
-        // (espace/tab/EOL ou '>'), afin d'accepter <record>, <record ...>
-        // ou <record xmlns="...">, sans matcher par erreur <records>.
+        // Locating <record>: matches the "<record" prefix, then checks
+        // that the next byte is indeed a tag-name boundary (space/tab/EOL
+        // or '>'), so as to accept <record>, <record ...> or
+        // <record xmlns="...">, without wrongly matching <records>.
         enum State { Searching, OpenTag, Content }
         let mut state = State::Searching;
-        let mut matched_start = 0; // progression dans XML_START_PREFIX
-        let mut matched_end = 0;   // progression dans XML_END_TAG
+        let mut matched_start = 0; // progress within XML_START_PREFIX
+        let mut matched_end = 0;   // progress within XML_END_TAG
 
         while !found {
-            // 1. Accès direct au tampon mémoire du BufReader
+            // 1. Direct access to the BufReader's memory buffer
             let available = self.reader.fill_buf()?;
             if available.is_empty() {
-                break; // Fin de fichier propre
+                break; // Clean end of file
             }
 
             let mut consumed = 0;
@@ -117,8 +117,8 @@ impl<R: Read + BufRead> Reader<R> {
                     },
                     State::OpenTag => {
                         if self.buffer.len() == XML_START_PREFIX.len() && !(b.is_ascii_whitespace() || b == b'>') {
-                            // Faux positif (ex: "<records") : on annule et on
-                            // reprend la recherche à partir de cet octet.
+                            // False positive (e.g. "<records"): cancel and
+                            // resume the search from this byte.
                             self.buffer.clear();
                             state = State::Searching;
                             matched_start = if b == XML_START_PREFIX[0] { 1 } else { 0 };
@@ -147,17 +147,17 @@ impl<R: Read + BufRead> Reader<R> {
                 }
             }
 
-            // 2. Informe le BufReader qu'on a traité `consumed` octets
+            // 2. Tell the BufReader that `consumed` bytes have been processed
             self.reader.consume(consumed);
         }
         Ok(option_record)
     }
 
-    /// Lit la prochaine notice texte : accumule les octets jusqu'à une
-    /// ligne vide (deux octets `\n` consécutifs), qui sépare deux notices
-    /// — c'est le séparateur produit par [`crate::Writer`] pour ce format. La
-    /// dernière notice du flux, non suivie d'une ligne vide, est acceptée
-    /// à la fin du flux (EOF) s'il reste du contenu accumulé.
+    /// Reads the next text record: accumulates bytes until a blank line
+    /// (two consecutive `\n` bytes), which separates two records — the
+    /// separator produced by [`crate::Writer`] for this format. The last
+    /// record in the stream, not followed by a blank line, is accepted at
+    /// end of stream (EOF) if there is accumulated content left.
     pub fn read_text(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
@@ -166,8 +166,8 @@ impl<R: Read + BufRead> Reader<R> {
         while !found {
             let available = self.reader.fill_buf()?;
             if available.is_empty() {
-                // Fin de flux : la dernière notice n'est suivie d'aucune
-                // ligne vide, on décode ce qu'il reste s'il y en a.
+                // End of stream: the last record isn't followed by a
+                // blank line, decode what's left if there is any.
                 if !self.buffer.is_empty() {
                     option_record = Some(self.format.deserialize(&self.buffer)?);
                 }
@@ -178,8 +178,8 @@ impl<R: Read + BufRead> Reader<R> {
             for &b in available {
                 consumed += 1;
                 if b == b'\n' && self.buffer.last() == Some(&b'\n') {
-                    // Deux '\n' consécutifs : ligne vide séparatrice, pas
-                    // incluse dans la notice.
+                    // Two consecutive '\n': separating blank line, not
+                    // included in the record.
                     found = true;
                     option_record = Some(self.format.deserialize(&self.buffer)?);
                     break;

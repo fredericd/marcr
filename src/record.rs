@@ -3,8 +3,8 @@ use std::str;
 
 use crate::DEFAULT_LEADER;
 
-/// Un sous-champ d'un champ MARC "standard" (tag ≥ 10) : un code d'un
-/// caractère (`$a`, `$b`, ...) et sa valeur.
+/// A subfield of a "standard" MARC field (tag ≥ 10): a one-character
+/// code (`$a`, `$b`, ...) and its value.
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
 
@@ -15,20 +15,20 @@ impl fmt::Display for Subfield {
     }
 }
 
-/// Un champ d'une notice MARC : soit un champ de contrôle (tag < 10, une
-/// simple valeur texte), soit un champ standard (tag ≥ 10, deux
-/// indicateurs et une liste de sous-champs).
+/// A field of a MARC record: either a control field (tag < 10, a plain
+/// text value), or a standard field (tag ≥ 10, two indicators and a list
+/// of subfields).
 #[derive(Debug)]
 pub enum Field {
-    /// Champ de contrôle (tags 001-009) : tag et valeur.
+    /// Control field (tags 001-009): tag and value.
     Control(u16, String),
-    /// Champ standard (tags ≥ 010) : tag, les deux indicateurs, et les
-    /// sous-champs.
+    /// Standard field (tags ≥ 010): tag, the two indicators, and the
+    /// subfields.
     Standard(u16, [char; 2], Vec<Subfield>),
 }
 
 impl Field {
-    /// Le tag du champ (001-999).
+    /// The field's tag (001-999).
     pub fn tag(&self) -> &u16 {
         match self {
             Field::Control(tag, _) => tag,
@@ -55,15 +55,14 @@ impl fmt::Display for Field {
     }
 }
 
-/// Une notice bibliographique MARC : un leader de 24 octets et une liste
-/// de champs.
+/// A MARC bibliographic record: a 24-byte leader and a list of fields.
 #[derive(Debug)]
 pub struct Record {
-    /// Les 24 octets du leader (longueur de la notice, statut, type de
-    /// document, position/taille du répertoire, etc.).
+    /// The 24 leader bytes (record length, status, document type,
+    /// directory position/size, etc.).
     pub leader: [u8; 24],
-    /// Les champs de la notice, triés par tag croissant lorsqu'ils sont
-    /// ajoutés via [`Record::add`] ou [`Record::insert`].
+    /// The record's fields, sorted by increasing tag when added via
+    /// [`Record::add`] or [`Record::insert`].
     pub fields: Vec<Field>,
 }
 
@@ -91,8 +90,8 @@ impl Default for Record {
 }
 
 impl Record {
-    /// Insère `field` en conservant l'ordre croissant des tags (tri par
-    /// insertion : les champs de même tag gardent leur ordre relatif).
+    /// Inserts `field` while keeping tags in increasing order (insertion
+    /// sort: fields with the same tag keep their relative order).
     pub fn add(&mut self, field: Field) {
         let tag = field.tag();
         let pos: usize = self.fields.iter()
@@ -101,8 +100,8 @@ impl Record {
         self.fields.insert(pos, field);
     }
 
-    /// Construit une notice avec le leader par défaut et les champs
-    /// donnés, sans les trier (contrairement à [`Record::add`]).
+    /// Builds a record with the default leader and the given fields,
+    /// without sorting them (unlike [`Record::add`]).
     pub fn new(fields: Vec<Field>) -> Self {
         let leader: [u8; 24] = DEFAULT_LEADER;
         Self {
@@ -111,16 +110,15 @@ impl Record {
         }
     }
 
-    /// Construit et ajoute des champs à partir d'une notation compacte :
-    /// chaque `Vec<&str>` est `[tag, indicateurs_ou_valeur, code1, valeur1,
-    /// code2, valeur2, ...]`.
+    /// Builds and adds fields from a compact notation: each `Vec<&str>`
+    /// is `[tag, indicators_or_value, code1, value1, code2, value2, ...]`.
     ///
-    /// - Pour un champ de contrôle (tag ≤ 9) : `vec!["001", "PPN1234"]`.
-    /// - Pour un champ standard : `vec!["200", "  ", "a", "Titre", "b", "Sous-titre"]`
-    ///   où `"  "` sont les deux indicateurs.
+    /// - For a control field (tag ≤ 9): `vec!["001", "PPN1234"]`.
+    /// - For a standard field: `vec!["200", "  ", "a", "Title", "b", "Subtitle"]`
+    ///   where `"  "` are the two indicators.
     ///
-    /// Les entrées trop courtes ou mal formées sont silencieusement
-    /// ignorées. Les champs sont ajoutés triés par tag via [`Record::add`].
+    /// Entries that are too short or malformed are silently ignored.
+    /// Fields are added sorted by tag via [`Record::add`].
     pub fn insert(&mut self, a_a_a: Vec<Vec<&str>>) {
         for a_a in a_a_a {
             let len = a_a.len();
@@ -138,8 +136,8 @@ impl Record {
                     let ind_str = a_a[1];
                     let mut iter = ind_str.chars();
                     let ind: [char; 2] = [
-                        iter.next().expect("Premier caractère manquant"),
-                        iter.next().expect("Deuxième caractère manquant"),
+                        iter.next().expect("Missing first character"),
+                        iter.next().expect("Missing second character"),
                     ];
                     let mut subfields: Vec<Subfield> = Vec::new();
                     for i in (2..len-1).step_by(2) {
@@ -147,7 +145,7 @@ impl Record {
                         let value_str = a_a[i+1];
                         if letter_str.len() >= 1 && value_str.len() > 1 {
                             let mut iter = letter_str.chars();
-                            let letter = iter.next().expect("Pas une lettre pour sous-champ");
+                            let letter = iter.next().expect("Not a letter for subfield");
                             let value = String::from(value_str);
                             subfields.push(Subfield(letter, value));
                         }

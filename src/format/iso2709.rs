@@ -7,9 +7,9 @@ use crate::{parse_digits, Field, Record, Subfield, DE, FT, RT};
 use super::Format;
 
 impl Format {
-    /// Sérialise `record` en ISO 2709 : leader, répertoire, puis champs
-    /// terminés par FT (`0x1e`), l'ensemble terminé par RT (`0x1d`).
-    /// Recalcule la longueur et l'offset des données dans le leader.
+    /// Serializes `record` to ISO 2709: leader, directory, then fields
+    /// terminated by FT (`0x1e`), the whole terminated by RT (`0x1d`).
+    /// Recomputes the data length and offset in the leader.
     pub fn serialize_iso2709(&self, record: &Record) -> Vec<u8> {
         let mut fields: Vec<u8> = Vec::new();
         let mut directory: Vec<u8> = Vec::with_capacity(record.fields.len() * 12 + 1);
@@ -51,9 +51,9 @@ impl Format {
         data
     }
 
-    /// Parse une notice ISO 2709 complète (leader + répertoire + champs
-    /// terminés par FT/RT). Retourne une erreur si `octets` fait moins de
-    /// 40 octets ou si le répertoire est mal formé.
+    /// Parses a complete ISO 2709 record (leader + directory + fields
+    /// terminated by FT/RT). Returns an error if `octets` is shorter than
+    /// 40 bytes or if the directory is malformed.
     pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
         let leader: [u8; 24] = octets[..24].try_into().unwrap();
@@ -79,8 +79,9 @@ impl Format {
                 let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
                 let mut j = base + 2;
                 let field_end = base + len;
-                // +1 : la borne inclut l'octet FT qui termine le dernier sous-champ
-                // (exclu de `field_end`, qui sert à arrêter la boucle *avant* ce FT).
+                // +1: the bound includes the FT byte terminating the last
+                // subfield (excluded from `field_end`, which stops the loop
+                // *before* that FT).
                 let scan_end = field_end + 1;
                 let mut subfields: Vec<Subfield> = Vec::with_capacity(3);
                 while j < field_end {

@@ -1,12 +1,11 @@
-//! Lecture et écriture de notices bibliographiques MARC dans plusieurs
-//! formats : ISO 2709 ([`Format::Iso2709`]), MARCXML ([`Format::Marcxml`])
-//! et un format texte lisible, disponible en sortie uniquement
-//! ([`Format::Text`]).
+//! Reading and writing MARC bibliographic records in several formats:
+//! ISO 2709 ([`Format::Iso2709`]), MARCXML ([`Format::Marcxml`]), and a
+//! human-readable text format, output-only ([`Format::Text`]).
 //!
-//! [`Record`] représente une notice (leader + champs), [`Reader`] la lit
-//! depuis un flux quel que soit le format, [`Writer`] l'écrit vers un
-//! flux. [`Format`] centralise la sérialisation/désérialisation propre à
-//! chaque format.
+//! [`Record`] represents a record (leader + fields), [`Reader`] reads
+//! records from a stream regardless of format, [`Writer`] writes them to
+//! a stream. [`Format`] centralizes serialization/deserialization for
+//! each format.
 //!
 //! ```no_run
 //! use marcr::{Format, Reader, Writer};
@@ -37,11 +36,11 @@ const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
 const DE: u8 = 0x1f; // Delimiter
 const DEFAULT_LEADER: [u8; 24] = *b"00000nam a2200000   4500";
-const XML_START_PREFIX: &[u8] = b"<record"; // sans '>' : la balise peut porter des attributs (xmlns, ...)
+const XML_START_PREFIX: &[u8] = b"<record"; // without '>': the tag may carry attributes (xmlns, ...)
 const XML_END_TAG: &[u8] = b"</record>";
 
-/// Parse un nombre décimal ASCII de largeur fixe (répertoire ISO2709), sans
-/// passer par la validation UTF-8 générique + FromStr de `str::parse`.
+/// Parses a fixed-width ASCII decimal number (ISO2709 directory), without
+/// going through the generic UTF-8 validation + FromStr of `str::parse`.
 fn parse_digits(bytes: &[u8]) -> Option<usize> {
     let mut n: usize = 0;
     for &b in bytes {

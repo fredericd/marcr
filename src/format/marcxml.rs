@@ -9,9 +9,9 @@ use crate::{Field, Record, Subfield};
 use super::Format;
 
 impl Format {
-    /// Sérialise `record` en un élément `<record>` MARCXML (indenté),
-    /// sans prologue XML ni élément englobant `<collection>` — voir
-    /// [`crate::Writer`] pour produire un document MARCXML complet.
+    /// Serializes `record` to a MARCXML `<record>` element (indented),
+    /// with no XML prologue nor enclosing `<collection>` element — see
+    /// [`crate::Writer`] to produce a complete MARCXML document.
     pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
         let cursor = std::io::Cursor::new(Vec::new());
         let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
@@ -61,9 +61,9 @@ impl Format {
         octets
     }
 
-    /// Parse un élément `<record>` MARCXML (attributs et espace de noms
-    /// ignorés ; seuls les éléments `leader`, `controlfield`, `datafield`
-    /// et `subfield` sont reconnus). `octets` doit être de l'UTF-8 valide.
+    /// Parses a MARCXML `<record>` element (attributes and namespace
+    /// ignored; only the `leader`, `controlfield`, `datafield` and
+    /// `subfield` elements are recognized). `octets` must be valid UTF-8.
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         let xml: &str = unsafe { str::from_utf8_unchecked(octets) };
         let mut reader = XmlReader::from_str(xml);
@@ -95,7 +95,7 @@ impl Format {
                     }
                 },
                 Event::Start(e) if e.name().as_ref() == b"datafield" => {
-                    // Extraction : tag, ind1, ind2
+                    // Extract: tag, ind1, ind2
                     let mut tag: Option<u16> = None;
                     let mut ind1 = None;
                     let mut ind2 = None;
@@ -115,7 +115,7 @@ impl Format {
                     }
                 }
                 Event::Start(e) if e.name().as_ref() == b"subfield" => {
-                    // Extraction : code
+                    // Extract: code
                     let mut code = None;
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {

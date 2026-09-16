@@ -4,24 +4,24 @@ mod iso2709;
 mod marcxml;
 mod text;
 
-/// Un format de notice MARC, utilisé pour la (dé)sérialisation via
-/// [`Format::serialize`]/[`Format::deserialize`] ou par [`crate::Reader`]/[`crate::Writer`].
+/// A MARC record format, used for (de)serialization via
+/// [`Format::serialize`]/[`Format::deserialize`] or by [`crate::Reader`]/[`crate::Writer`].
 #[derive(PartialEq)]
 pub enum Format {
-  /// Format d'échange binaire ISO 2709 (extension `.mrc`). Lecture et
-  /// écriture supportées.
+  /// ISO 2709 binary exchange format (`.mrc` extension). Reading and
+  /// writing supported.
   Iso2709,
-  /// MARCXML, le schéma XML de la Library of Congress (extension `.xml`).
-  /// Lecture et écriture supportées.
+  /// MARCXML, the Library of Congress XML schema (`.xml` extension).
+  /// Reading and writing supported.
   Marcxml,
-  /// Format texte lisible, une ligne par champ (extension `.txt`).
-  /// Lecture et écriture supportées ; [`crate::Reader`] sépare les notices sur
-  /// une ligne vide (le séparateur produit par [`crate::Writer`] pour ce format).
+  /// Human-readable text format, one line per field (`.txt` extension).
+  /// Reading and writing supported; [`crate::Reader`] splits records on a
+  /// blank line (the separator produced by [`crate::Writer`] for this format).
   Text,
 }
 
-/// Métadonnées descriptives d'un [`Format`], utilisées par exemple pour
-/// peupler une liste déroulante ou choisir une extension de fichier.
+/// Descriptive metadata for a [`Format`], useful for example to populate
+/// a dropdown list or pick a file extension.
 #[allow(dead_code)]
 pub struct RWDescription {
     pub format: Format,
@@ -30,8 +30,8 @@ pub struct RWDescription {
 }
 
 impl Format {
-    /// La liste des formats supportés avec leur description et leur
-    /// extension de fichier usuelle.
+    /// The list of supported formats with their description and usual
+    /// file extension.
     pub fn get_available_formats() -> Vec<RWDescription> {
         vec![
             RWDescription{
@@ -52,13 +52,11 @@ impl Format {
         ]
     }
 
-    /// Parse `octets` (une notice complète, sans octets superflus avant
-    /// ou après) selon `self`. Voir [`crate::Reader`] pour lire des notices en
-    /// série depuis un flux plus large.
+    /// Parses `octets` (a complete record, with no extra bytes before or
+    /// after) according to `self`. See [`crate::Reader`] to read records
+    /// in sequence from a larger stream.
     ///
-    /// Retourne une erreur si `octets` n'est pas une notice valide dans ce
-    /// format, ou toujours une erreur pour [`Format::Text`] (écriture
-    /// uniquement).
+    /// Returns an error if `octets` is not a valid record in this format.
     pub fn deserialize(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         match self {
             Format::Iso2709 => self.deserialize_iso2709(octets),
@@ -67,8 +65,8 @@ impl Format {
         }
     }
 
-    /// Sérialise `record` selon `self`. Pour écrire plusieurs notices vers
-    /// un flux (en-tête/pied MARCXML, séparateurs), préférer [`crate::Writer`].
+    /// Serializes `record` according to `self`. To write several records
+    /// to a stream (MARCXML header/footer, separators), prefer [`crate::Writer`].
     pub fn serialize(&self, record: &Record) -> Vec<u8> {
         match self {
             Format::Iso2709 => self.serialize_iso2709(record),

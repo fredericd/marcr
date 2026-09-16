@@ -10,11 +10,11 @@ clap = { version = "4.6.6", features = ["derive"] }
 
 [profile.release]
 debug = true
-opt-level = 3       # Optimise pour la vitesse d'exécution plutôt que la taille du binaire
-lto = true          # Link-Time Optimization : élimine le code mort à travers toutes les crates
-codegen-units = 1   # Réduit le parallélisme de compilation pour maximiser l'optimisation
-panic = "abort"     # Supprime le mécanisme de déroulement de pile (unwind) en cas de panic
-strip = true        # Retire tous les symboles de débogage du binaire final
+opt-level = 3       # Optimize for execution speed rather than binary size
+lto = true          # Link-Time Optimization: eliminates dead code across all crates
+codegen-units = 1   # Reduces compilation parallelism to maximize optimization
+panic = "abort"     # Removes the stack unwinding mechanism on panic
+strip = true        # Strips all debug symbols from the final binary
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
