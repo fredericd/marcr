@@ -86,7 +86,7 @@ impl Field {
 impl fmt::Display for Field {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Field::Control(tag, value) => write!(f, "{tag:03}    {value}"),
+            Field::Control(tag, value) => write!(f, "{tag:03} {value}"),
             Field::Standard(tag, ind, subfs) => {
                 let ind1 = ind[0];
                 let ind2 = ind[1];
@@ -217,9 +217,8 @@ pub enum Format {
   /// Lecture et écriture supportées.
   Marcxml,
   /// Format texte lisible, une ligne par champ (extension `.txt`).
-  /// [`Format::serialize`]/[`Format::deserialize`] sont supportés, mais
-  /// pas [`Reader`] (aucune détection de limite d'enregistrement dans un
-  /// flux de plusieurs notices).
+  /// Lecture et écriture supportées ; [`Reader`] sépare les notices sur
+  /// une ligne vide (le séparateur produit par [`Writer`] pour ce format).
   Text,
 }
 
@@ -534,7 +533,7 @@ impl Format {
         for field in record.fields.iter() {
             match field {
                 Field::Control(tag, value) => {
-                    lines.push(format!("{tag:03}    {value}"));
+                    lines.push(format!("{tag:03} {value}"));
                 },
                 Field::Standard(tag, ind, subfields) => {
                     let ind1 = ind[0];
@@ -553,7 +552,8 @@ impl Format {
     }
 
     /// Sérialise `record` en texte lisible : le leader puis une ligne par
-    /// champ (`tag ind1ind2 $code valeur ...`).
+    /// champ — `tag valeur` (un seul espace séparateur) pour un champ de
+    /// contrôle, `tag ind1ind2 $code valeur ...` pour un champ standard.
     pub fn serialize_text(&self, record: &Record) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
@@ -561,7 +561,7 @@ impl Format {
         for field in record.fields.iter() {
             match field {
                 Field::Control(tag, value) => {
-                    write!(buffer, "{tag:03}    {value}\n").unwrap();
+                    write!(buffer, "{tag:03} {value}\n").unwrap();
                 },
                 Field::Standard(tag, ind, subfields) => {
                     let ind1 = ind[0];
@@ -585,9 +585,9 @@ impl Format {
 
     /// Parse un enregistrement produit par [`Format::serialize_text`] :
     /// une ligne pour le leader (24 caractères), puis une ligne par champ —
-    /// `tag    valeur` pour un champ de contrôle (tag < 10), ou
-    /// `tag ind1ind2 $code valeur $code2 valeur2 ...` pour un champ
-    /// standard.
+    /// `tag valeur` (un seul espace séparateur) pour un champ de contrôle
+    /// (tag < 10), ou `tag ind1ind2 $code valeur $code2 valeur2 ...`
+    /// (structure à largeur fixe) pour un champ standard.
     ///
     /// Le format texte n'a pas de mécanisme d'échappement : une valeur de
     /// sous-champ contenant littéralement `" $"` suivi d'un caractère sera
@@ -603,19 +603,30 @@ impl Format {
         let mut fields = Vec::new();
         for line in lines {
             if line.is_empty() { continue; }
-            if line.len() < 7 || !line.is_char_boundary(7) {
+            if line.len() < 3 {
                 return Err("Bad text record: ligne de champ trop courte".into());
             }
             let bytes = line.as_bytes();
             let tag: u16 = parse_digits(&bytes[..3])
                 .and_then(|t| u16::try_from(t).ok())
                 .ok_or("Bad text record: tag invalide")?;
-            let rest = &line[7..];
 
             if tag < 10 {
-                fields.push(Field::Control(tag, rest.to_string()));
+                // "tag valeur" : un seul espace séparateur (pas
+                // d'indicateurs pour un champ de contrôle).
+                if bytes.get(3) != Some(&b' ') {
+                    return Err("Bad text record: séparateur manquant après le tag".into());
+                }
+                fields.push(Field::Control(tag, line[4..].to_string()));
             } else {
+                // "tag ind1ind2 $code valeur ...": structure à largeur
+                // fixe (7 caractères avant les sous-champs), les deux
+                // indicateurs ne pouvant pas servir de séparateur.
+                if line.len() < 7 || !line.is_char_boundary(7) {
+                    return Err("Bad text record: ligne de champ trop courte".into());
+                }
                 let ind: [char; 2] = [bytes[4] as char, bytes[5] as char];
+                let rest = &line[7..];
                 let mut subfields = Vec::new();
                 if !rest.is_empty() {
                     let body = rest.strip_prefix('$')
@@ -640,8 +651,9 @@ impl Format {
 /// Lit des notices en série depuis un flux `R`, dans un format donné.
 ///
 /// Chaque appel à [`Reader::read`] extrait et parse la notice suivante,
-/// sans avoir à charger tout le flux en mémoire. `format: Text` n'est pas
-/// supporté en lecture.
+/// sans avoir à charger tout le flux en mémoire. Pour `format: Text`, les
+/// notices doivent être séparées par une ligne vide (c'est ce que produit
+/// [`Writer`] pour ce format).
 pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
@@ -660,13 +672,12 @@ impl<R: Read + BufRead> Reader<R> {
     /// Lit et parse la prochaine notice du flux.
     ///
     /// Retourne `Ok(None)` en fin de flux, `Err` en cas d'erreur de
-    /// lecture ou de notice mal formée, ou toujours `Err` si
-    /// `format == Format::Text` (lecture non supportée).
+    /// lecture ou de notice mal formée.
     pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
             Format::Marcxml => self.read_marcxml(),
-            Format::Text    => return Err("Pas de parser pour Text".into()),
+            Format::Text    => self.read_text(),
         }
     }
 
@@ -781,6 +792,44 @@ impl<R: Read + BufRead> Reader<R> {
             }
 
             // 2. Informe le BufReader qu'on a traité `consumed` octets
+            self.reader.consume(consumed);
+        }
+        Ok(option_record)
+    }
+
+    /// Lit la prochaine notice texte : accumule les octets jusqu'à une
+    /// ligne vide (deux octets `\n` consécutifs), qui sépare deux notices
+    /// — c'est le séparateur produit par [`Writer`] pour ce format. La
+    /// dernière notice du flux, non suivie d'une ligne vide, est acceptée
+    /// à la fin du flux (EOF) s'il reste du contenu accumulé.
+    pub fn read_text(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+        self.buffer.clear();
+        let mut found = false;
+        let mut option_record: Option<Record> = None;
+
+        while !found {
+            let available = self.reader.fill_buf()?;
+            if available.is_empty() {
+                // Fin de flux : la dernière notice n'est suivie d'aucune
+                // ligne vide, on décode ce qu'il reste s'il y en a.
+                if !self.buffer.is_empty() {
+                    option_record = Some(self.format.deserialize(&self.buffer)?);
+                }
+                break;
+            }
+
+            let mut consumed = 0;
+            for &b in available {
+                consumed += 1;
+                if b == b'\n' && self.buffer.last() == Some(&b'\n') {
+                    // Deux '\n' consécutifs : ligne vide séparatrice, pas
+                    // incluse dans la notice.
+                    found = true;
+                    option_record = Some(self.format.deserialize(&self.buffer)?);
+                    break;
+                }
+                self.buffer.push(b);
+            }
             self.reader.consume(consumed);
         }
         Ok(option_record)

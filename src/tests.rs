@@ -1,8 +1,8 @@
 use super::*;
 
 const EXPECTED_DEFAULT_RECORD: &str = "00146nam a2200073   4500
-001    000001
-005    2026
+001 000001
+005 2026
 200  1 $a Mon titre $e Complément du titre
 700  1 $a Demians $b Frédéric";
 
@@ -34,7 +34,7 @@ fn get_default_record() -> Record {
 fn field_control_display() {
     let field = Field::Control(001, "1234".to_string());
     let text = field.to_string();
-    assert_eq!(text, "001    1234");
+    assert_eq!(text, "001 1234");
 }
 
 #[test]
@@ -76,6 +76,23 @@ fn text_reader() {
 }
 
 #[test]
+fn text_reader_control_field_single_space_separator() {
+    // Cas signalé : un champ de contrôle avec une valeur très courte,
+    // ex. "001 2", ne doit pas être rejeté par une longueur minimale
+    // pensée pour les champs standard (qui ont des indicateurs).
+    let text = "00000nam a2200000   4500\n001 2";
+    let record = Format::Text.deserialize(text.as_bytes())
+        .expect("La désérialisation texte a échoué");
+    match &record.fields[0] {
+        Field::Control(tag, value) => {
+            assert_eq!(*tag, 1);
+            assert_eq!(value, "2");
+        },
+        other => panic!("Champ de contrôle attendu, obtenu {other:?}"),
+    }
+}
+
+#[test]
 fn text_roundtrip() {
     // serialize_text() puis deserialize_text() doit redonner la même notice.
     let record = get_default_record();
@@ -83,6 +100,32 @@ fn text_roundtrip() {
     let parsed = Format::Text.deserialize(&octets)
         .expect("La désérialisation texte a échoué");
     assert_eq!(parsed.to_string(), record.to_string());
+}
+
+#[test]
+fn text_reader_multi_record_stream() {
+    // Writer sépare les notices texte par une ligne vide ; Reader doit
+    // retrouver exactement les mêmes notices en sens inverse.
+    let record = get_default_record();
+    let mut writer = Writer::new(Format::Text, std::io::Cursor::new(Vec::new()));
+    writer.write(&record).unwrap();
+    writer.write(&record).unwrap();
+    let octets: Vec<u8> = writer.writer.get_ref().as_slice().to_vec();
+    drop(writer);
+
+    let mut reader = Reader::new(Format::Text, std::io::Cursor::new(octets));
+    let expected = String::from(EXPECTED_DEFAULT_RECORD);
+    for _ in 0..2 {
+        match reader.read() {
+            Ok(Some(record)) => assert_eq!(record.to_string(), expected),
+            Ok(None) => panic!("Fin de flux prématurée"),
+            Err(e) => panic!("Erreur de lecture: {e}"),
+        }
+    }
+    match reader.read() {
+        Ok(None) => (),
+        other => panic!("Attendu None en fin de flux, obtenu {other:?}"),
+    }
 }
 
 #[test]
@@ -241,7 +284,7 @@ fn record_insert() {
     ]);
     let text = record.to_string();
     let expected = String::from("00000nam a2200000   4500
-001    PPN1234
+001 PPN1234
 010    $a 9782070368228
 200    $a Mon titre $b Texte imprimé $e Complément
 600    $a Personnage 1
