@@ -1,3 +1,28 @@
+//! Lecture et écriture de notices bibliographiques MARC dans plusieurs
+//! formats : ISO 2709 ([`Format::Iso2709`]), MARCXML ([`Format::Marcxml`])
+//! et un format texte lisible, disponible en sortie uniquement
+//! ([`Format::Text`]).
+//!
+//! [`Record`] représente une notice (leader + champs), [`Reader`] la lit
+//! depuis un flux quel que soit le format, [`Writer`] l'écrit vers un
+//! flux. [`Format`] centralise la sérialisation/désérialisation propre à
+//! chaque format.
+//!
+//! ```no_run
+//! use marcr::{Format, Reader, Writer};
+//! use std::io::BufReader;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let input = BufReader::new(std::fs::File::open("notices.mrc")?);
+//! let mut reader = Reader::new(Format::Iso2709, input);
+//! let mut writer = Writer::new(Format::Marcxml, std::io::stdout());
+//! while let Some(record) = reader.read()? {
+//!     writer.write(&record)?;
+//! }
+//! # Ok(())
+//! # }
+//! ```
+
 use std::fmt;
 use std::str;
 use std::io::{Write, Read, BufRead};
@@ -24,6 +49,8 @@ fn parse_digits(bytes: &[u8]) -> Option<usize> {
     Some(n)
 }
 
+/// Un sous-champ d'un champ MARC "standard" (tag ≥ 10) : un code d'un
+/// caractère (`$a`, `$b`, ...) et sa valeur.
 #[derive(Debug)]
 pub struct Subfield(pub char, pub String);
 
@@ -34,16 +61,20 @@ impl fmt::Display for Subfield {
     }
 }
 
-/// A MARC record field representation.
-///
-/// A field can be a control field or a standard field
+/// Un champ d'une notice MARC : soit un champ de contrôle (tag < 10, une
+/// simple valeur texte), soit un champ standard (tag ≥ 10, deux
+/// indicateurs et une liste de sous-champs).
 #[derive(Debug)]
 pub enum Field {
+    /// Champ de contrôle (tags 001-009) : tag et valeur.
     Control(u16, String),
+    /// Champ standard (tags ≥ 010) : tag, les deux indicateurs, et les
+    /// sous-champs.
     Standard(u16, [char; 2], Vec<Subfield>),
 }
 
 impl Field {
+    /// Le tag du champ (001-999).
     pub fn tag(&self) -> &u16 {
         match self {
             Field::Control(tag, _) => tag,
@@ -70,9 +101,15 @@ impl fmt::Display for Field {
     }
 }
 
+/// Une notice bibliographique MARC : un leader de 24 octets et une liste
+/// de champs.
 #[derive(Debug)]
 pub struct Record {
+    /// Les 24 octets du leader (longueur de la notice, statut, type de
+    /// document, position/taille du répertoire, etc.).
     pub leader: [u8; 24],
+    /// Les champs de la notice, triés par tag croissant lorsqu'ils sont
+    /// ajoutés via [`Record::add`] ou [`Record::insert`].
     pub fields: Vec<Field>,
 }
 
@@ -100,6 +137,8 @@ impl Default for Record {
 }
 
 impl Record {
+    /// Insère `field` en conservant l'ordre croissant des tags (tri par
+    /// insertion : les champs de même tag gardent leur ordre relatif).
     pub fn add(&mut self, field: Field) {
         let tag = field.tag();
         let pos: usize = self.fields.iter()
@@ -108,6 +147,8 @@ impl Record {
         self.fields.insert(pos, field);
     }
 
+    /// Construit une notice avec le leader par défaut et les champs
+    /// donnés, sans les trier (contrairement à [`Record::add`]).
     pub fn new(fields: Vec<Field>) -> Self {
         let leader: [u8; 24] = DEFAULT_LEADER;
         Self {
@@ -116,6 +157,16 @@ impl Record {
         }
     }
 
+    /// Construit et ajoute des champs à partir d'une notation compacte :
+    /// chaque `Vec<&str>` est `[tag, indicateurs_ou_valeur, code1, valeur1,
+    /// code2, valeur2, ...]`.
+    ///
+    /// - Pour un champ de contrôle (tag ≤ 9) : `vec!["001", "PPN1234"]`.
+    /// - Pour un champ standard : `vec!["200", "  ", "a", "Titre", "b", "Sous-titre"]`
+    ///   où `"  "` sont les deux indicateurs.
+    ///
+    /// Les entrées trop courtes ou mal formées sont silencieusement
+    /// ignorées. Les champs sont ajoutés triés par tag via [`Record::add`].
     pub fn insert(&mut self, a_a_a: Vec<Vec<&str>>) {
         for a_a in a_a_a {
             let len = a_a.len();
@@ -155,13 +206,24 @@ impl Record {
     }
 }
 
+/// Un format de notice MARC, utilisé pour la (dé)sérialisation via
+/// [`Format::serialize`]/[`Format::deserialize`] ou par [`Reader`]/[`Writer`].
 #[derive(PartialEq)]
 pub enum Format {
+  /// Format d'échange binaire ISO 2709 (extension `.mrc`). Lecture et
+  /// écriture supportées.
   Iso2709,
+  /// MARCXML, le schéma XML de la Library of Congress (extension `.xml`).
+  /// Lecture et écriture supportées.
   Marcxml,
+  /// Format texte lisible, une ligne par champ (extension `.txt`).
+  /// **Écriture uniquement** : [`Format::deserialize_text`] retourne
+  /// toujours une erreur.
   Text,
 }
 
+/// Métadonnées descriptives d'un [`Format`], utilisées par exemple pour
+/// peupler une liste déroulante ou choisir une extension de fichier.
 #[allow(dead_code)]
 pub struct RWDescription {
     pub format: Format,
@@ -170,6 +232,8 @@ pub struct RWDescription {
 }
 
 impl Format {
+    /// La liste des formats supportés avec leur description et leur
+    /// extension de fichier usuelle.
     pub fn get_available_formats() -> Vec<RWDescription> {
         vec![
             RWDescription{
@@ -190,6 +254,13 @@ impl Format {
         ]
     }
 
+    /// Parse `octets` (une notice complète, sans octets superflus avant
+    /// ou après) selon `self`. Voir [`Reader`] pour lire des notices en
+    /// série depuis un flux plus large.
+    ///
+    /// Retourne une erreur si `octets` n'est pas une notice valide dans ce
+    /// format, ou toujours une erreur pour [`Format::Text`] (écriture
+    /// uniquement).
     pub fn deserialize(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         match self {
             Format::Iso2709 => self.deserialize_iso2709(octets),
@@ -198,6 +269,8 @@ impl Format {
         }
     }
 
+    /// Sérialise `record` selon `self`. Pour écrire plusieurs notices vers
+    /// un flux (en-tête/pied MARCXML, séparateurs), préférer [`Writer`].
     pub fn serialize(&self, record: &Record) -> Vec<u8> {
         match self {
             Format::Iso2709 => self.serialize_iso2709(record),
@@ -206,6 +279,9 @@ impl Format {
         }
     }
 
+    /// Sérialise `record` en ISO 2709 : leader, répertoire, puis champs
+    /// terminés par FT (`0x1e`), l'ensemble terminé par RT (`0x1d`).
+    /// Recalcule la longueur et l'offset des données dans le leader.
     pub fn serialize_iso2709(&self, record: &Record) -> Vec<u8> {
         let mut fields: Vec<u8> = Vec::new();
         let mut directory: Vec<u8> = Vec::with_capacity(record.fields.len() * 12 + 1);
@@ -247,6 +323,9 @@ impl Format {
         data
     }
  
+    /// Parse une notice ISO 2709 complète (leader + répertoire + champs
+    /// terminés par FT/RT). Retourne une erreur si `octets` fait moins de
+    /// 40 octets ou si le répertoire est mal formé.
     pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
         let leader: [u8; 24] = octets[..24].try_into().unwrap();
@@ -303,6 +382,9 @@ impl Format {
         Ok(record)
     }
 
+    /// Sérialise `record` en un élément `<record>` MARCXML (indenté),
+    /// sans prologue XML ni élément englobant `<collection>` — voir
+    /// [`Writer`] pour produire un document MARCXML complet.
     pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
         let cursor = std::io::Cursor::new(Vec::new());
         let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
@@ -352,6 +434,9 @@ impl Format {
         octets
     }
 
+    /// Parse un élément `<record>` MARCXML (attributs et espace de noms
+    /// ignorés ; seuls les éléments `leader`, `controlfield`, `datafield`
+    /// et `subfield` sont reconnus). `octets` doit être de l'UTF-8 valide.
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         let xml: &str = unsafe { str::from_utf8_unchecked(octets) };
         let mut reader = XmlReader::from_str(xml);
@@ -438,6 +523,9 @@ impl Format {
         Ok(record)
     }
 
+    /// Implémentation de référence, non optimisée, de la sérialisation
+    /// texte (assemble des `String` intermédiaires). Conservée à titre de
+    /// comparaison ; [`Format::serialize`] utilise [`Format::serialize_text`].
     pub fn serialize_text_slow(&self, record: &Record) -> Vec<u8> {
         let mut lines: Vec<String> = Vec::new();
         let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
@@ -463,6 +551,8 @@ impl Format {
         lines.join("\n").into_bytes()
     }
 
+    /// Sérialise `record` en texte lisible : le leader puis une ligne par
+    /// champ (`tag ind1ind2 $code valeur ...`).
     pub fn serialize_text(&self, record: &Record) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
         let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
@@ -492,6 +582,8 @@ impl Format {
         buffer
     }
 
+    /// Toujours en erreur : le format texte n'a pas de parseur, il n'est
+    /// utilisable qu'en sortie.
     pub fn deserialize_text(&self, _octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         return Err("No serializer available".into());
     }
@@ -499,6 +591,11 @@ impl Format {
 
 }
 
+/// Lit des notices en série depuis un flux `R`, dans un format donné.
+///
+/// Chaque appel à [`Reader::read`] extrait et parse la notice suivante,
+/// sans avoir à charger tout le flux en mémoire. `format: Text` n'est pas
+/// supporté en lecture.
 pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
@@ -507,12 +604,18 @@ pub struct Reader<R> {
 }
 
 impl<R: Read + BufRead> Reader<R> {
+    /// Crée un lecteur pour `format` au-dessus du flux bufferisé `reader`.
     pub fn new(format: Format, reader: R) -> Self {
         let buffer: Vec<u8> = Vec::new();
         let count = 0;
         Self { format, reader, buffer, count }
     }
 
+    /// Lit et parse la prochaine notice du flux.
+    ///
+    /// Retourne `Ok(None)` en fin de flux, `Err` en cas d'erreur de
+    /// lecture ou de notice mal formée, ou toujours `Err` si
+    /// `format == Format::Text` (lecture non supportée).
     pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
@@ -521,6 +624,9 @@ impl<R: Read + BufRead> Reader<R> {
         }
     }
 
+    /// Lit la prochaine notice ISO 2709 : cherche l'octet RT (`0x1d`) qui
+    /// la termine dans le flux, en accumulant dans un tampon interne si
+    /// elle s'étend sur plusieurs lectures du `BufReader`.
     pub fn read_iso2709(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         // Tampon de secours uniquement pour les notices plus grandes que la taille du BufReader
         self.buffer.clear();
@@ -555,6 +661,9 @@ impl<R: Read + BufRead> Reader<R> {
         Ok(option_record)
     }
 
+    /// Lit la prochaine notice MARCXML : cherche l'élément `<record>`
+    /// suivant (avec ou sans attributs, ex. `xmlns="..."`) puis capture
+    /// jusqu'à `</record>` inclus.
     pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
@@ -632,6 +741,13 @@ impl<R: Read + BufRead> Reader<R> {
     }
 }
 
+/// Écrit des notices en série vers un flux `W`, dans un format donné.
+///
+/// Pour [`Format::Marcxml`], le prologue XML et l'élément `<collection>`
+/// englobant sont écrits automatiquement (ouverture au premier
+/// [`Writer::write`], fermeture au [`Drop`] du `Writer`) ; pour
+/// [`Format::Text`] et [`Format::Marcxml`], les notices successives sont
+/// séparées par une ligne vide.
 pub struct Writer<W: Write> {
     pub format: Format,
     pub writer: W,
@@ -640,11 +756,13 @@ pub struct Writer<W: Write> {
 
 impl<W: Write> Writer<W> {
 
+    /// Crée un writer pour `format` au-dessus du flux `writer`.
     pub fn new(format: Format, writer: W) -> Self {
         let count = 0;
         Self { format, writer, count }
     }
 
+    /// Sérialise et écrit `record` vers le flux.
     pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
         if self.format == Format::Marcxml && self.count == 0 {
             self.writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collection>\n".as_bytes())?;
