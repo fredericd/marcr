@@ -69,6 +69,42 @@ fn text_writer() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn text_reader() {
+    let record = Format::Text.deserialize(EXPECTED_DEFAULT_RECORD.as_bytes())
+        .expect("La désérialisation texte a échoué");
+    assert_eq!(record.to_string(), EXPECTED_DEFAULT_RECORD);
+}
+
+#[test]
+fn text_roundtrip() {
+    // serialize_text() puis deserialize_text() doit redonner la même notice.
+    let record = get_default_record();
+    let octets = Format::Text.serialize(&record);
+    let parsed = Format::Text.deserialize(&octets)
+        .expect("La désérialisation texte a échoué");
+    assert_eq!(parsed.to_string(), record.to_string());
+}
+
+#[test]
+fn text_reader_empty_subfields() {
+    // Un champ standard sans sous-champ doit rester valide (indicateurs
+    // conservés, liste de sous-champs vide) : sérialiser puis déserialiser
+    // évite d'écrire à la main une chaîne fragile pleine d'espaces.
+    let record = Record::new(vec![Field::Standard(200, [' ', ' '], vec![])]);
+    let octets = Format::Text.serialize(&record);
+    let parsed = Format::Text.deserialize(&octets)
+        .expect("La désérialisation texte a échoué");
+    match &parsed.fields[0] {
+        Field::Standard(tag, ind, subfields) => {
+            assert_eq!(*tag, 200);
+            assert_eq!(*ind, [' ', ' ']);
+            assert!(subfields.is_empty());
+        },
+        other => panic!("Champ standard attendu, obtenu {other:?}"),
+    }
+}
+
+#[test]
 fn iso2709_writer() -> Result<(), Box<dyn std::error::Error>> {
     let record = get_default_record();
     let mut writer = Writer::new(Format::Iso2709, std::io::Cursor::new(Vec::new()));
