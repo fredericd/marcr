@@ -2,6 +2,12 @@
 name = "marcr"
 version = "0.1.0"
 edition = "2024"
+description = "Read and write MARC bibliographic records in ISO 2709, MARCXML and text formats"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["marc", "marcxml", "iso2709", "bibliographic", "library"]
+categories = ["parsing", "encoding"]
+include = ["src/**", "README.md", "LICENSE-MIT", "LICENSE-APACHE"]
 
 [dependencies]
 quick-xml = "0.41"

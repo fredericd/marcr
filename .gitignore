@@ -1,3 +1,8 @@
 /target
 .DS_Store
 *.mrc
+dump.*
+d.txt
+d.xml
+file.txt
+toto.log
