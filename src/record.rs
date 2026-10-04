@@ -157,6 +157,27 @@ impl Record {
         }
     }
 
+    /// Returns the first field with the given `tag`, or `None` if the
+    /// record has none. Use [`Record::fields_by_tag`] to get all of them.
+    ///
+    /// ```
+    /// use marcr::{Field, Record};
+    ///
+    /// let mut record = Record::default();
+    /// record.insert(vec![
+    ///     vec!["001", "PPN1234"],
+    ///     vec!["200", " 1", "a", "Mon titre", "e", "Complément"],
+    /// ]);
+    ///
+    /// if let Some(Field::Standard(_, _, subfields)) = record.field(200) {
+    ///     assert_eq!(subfields[0].1, "Mon titre");
+    /// }
+    /// assert!(record.field(999).is_none());
+    /// ```
+    pub fn field(&self, tag: u16) -> Option<&Field> {
+        self.fields.iter().find(|field| *field.tag() == tag)
+    }
+
     /// Returns an iterator over the fields with the given `tag`, in their
     /// existing order.
     pub fn fields_by_tag(&self, tag: u16) -> impl Iterator<Item = &Field> {

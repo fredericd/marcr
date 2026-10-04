@@ -316,6 +316,27 @@ fn record_fields_by_tag() {
 }
 
 #[test]
+fn record_field() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["001", "PPN1234"],
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+    ]);
+
+    // The first occurrence is returned, not the last one.
+    match record.field(610) {
+        Some(Field::Standard(_, _, subfields)) => assert_eq!(subfields[0].1, "Sujet 1"),
+        other => panic!("Expected a standard field, got {other:?}"),
+    }
+    match record.field(1) {
+        Some(Field::Control(_, value)) => assert_eq!(value, "PPN1234"),
+        other => panic!("Expected a control field, got {other:?}"),
+    }
+    assert!(record.field(999).is_none());
+}
+
+#[test]
 fn record_remove_tag() {
     let mut record = Record::default();
     record.insert(vec![

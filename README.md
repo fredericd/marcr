@@ -108,6 +108,36 @@ loop {
 `Record` directly exposes its fields (`leader`, `fields`) as well as
 utility methods (`add`, `insert`) to build a record programmatically.
 
+To access fields by tag, `field` returns the first field with a given
+tag (`None` if there is none), `fields_by_tag` iterates over all of them,
+and `remove_tag` removes and returns them:
+
+```rust
+use marcr::{Field, Record};
+
+let mut record = Record::default();
+record.insert(vec![
+    vec!["001", "PPN1234"],
+    vec!["200", " 1", "a", "Mon titre"],
+    vec!["610", "  ", "a", "Sujet 1"],
+    vec!["610", "  ", "a", "Sujet 2"],
+]);
+
+// First occurrence of a tag
+match record.field(200) {
+    Some(Field::Standard(_, indicators, subfields)) => {
+        println!("200 {indicators:?}: {}", subfields[0].1);
+    }
+    Some(Field::Control(_, value)) => println!("{value}"), // tags 001-009
+    None => println!("no 200 field"),
+}
+
+// All occurrences of a tag
+for field in record.fields_by_tag(610) {
+    println!("{field}");
+}
+```
+
 ## Tests
 
 ```sh
