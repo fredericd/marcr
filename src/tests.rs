@@ -335,3 +335,28 @@ fn record_remove_tag() {
 
     assert!(record.remove_tag(999).is_empty());
 }
+
+#[test]
+fn iso2709_reader_continues_after_malformed_record() {
+    // A malformed record must yield an error without blocking the stream:
+    // the next call to read() returns the following record.
+    let good = "00146nam a2200073   4500001000700000005000500007200003600012700002400048\u{1e}000001\u{1e}2026\u{1e} 1\u{1f}aMon titre\u{1f}eComplément du titre\u{1e} 1\u{1f}aDemians\u{1f}bFrédéric\u{1e}\u{1d}";
+    let bad = good.replacen("4500001", "45000X1", 1); // invalid tag in the directory
+    let raw = format!("{good}{bad}{good}");
+    let mut reader = Reader::new(Format::Iso2709, std::io::Cursor::new(raw.into_bytes()));
+    let expected = String::from(EXPECTED_DEFAULT_RECORD);
+
+    match reader.read() {
+        Ok(Some(record)) => assert_eq!(record.to_string(), expected),
+        other => panic!("Expected first record, got {other:?}"),
+    }
+    assert!(reader.read().is_err(), "Expected an error on the malformed record");
+    match reader.read() {
+        Ok(Some(record)) => assert_eq!(record.to_string(), expected),
+        other => panic!("Expected third record, got {other:?}"),
+    }
+    match reader.read() {
+        Ok(None) => (),
+        other => panic!("Expected None at end of stream, got {other:?}"),
+    }
+}

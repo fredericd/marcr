@@ -28,7 +28,9 @@ impl<R: Read + BufRead> Reader<R> {
     /// Reads and parses the next record from the stream.
     ///
     /// Returns `Ok(None)` at end of stream, `Err` on a read error or a
-    /// malformed record.
+    /// malformed record. A malformed record is consumed from the stream
+    /// before its error is returned, so reading can go on with the next
+    /// record by calling `read` again.
     pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
@@ -44,7 +46,9 @@ impl<R: Read + BufRead> Reader<R> {
         // Fallback buffer, only for records larger than the BufReader's capacity
         self.buffer.clear();
         let mut found = false;
-        let mut option_record: Option<Record> = None;
+        // The deserialization result is kept until the record bytes are
+        // consumed, so that a malformed record doesn't block the stream.
+        let mut option_result = None;
         while !found {
             let available = self.reader.fill_buf()?;
             if available.is_empty() {
@@ -56,11 +60,11 @@ impl<R: Read + BufRead> Reader<R> {
                     if self.buffer.is_empty() {
                         // Found in reader buffer. No need to use an internal buffer, ie zero-copy
                         let octets = &available[..=pos];
-                        option_record = Some(self.format.deserialize(octets)?);
+                        option_result = Some(self.format.deserialize(octets));
                     } else {
                         // Found a record which was extended on several reader buffer
                         self.buffer.extend_from_slice(&available[..=pos]);
-                        option_record = Some(self.format.deserialize(&self.buffer)?);
+                        option_result = Some(self.format.deserialize(&self.buffer));
                     }
                     found = true;
                     pos + 1
@@ -71,7 +75,7 @@ impl<R: Read + BufRead> Reader<R> {
             };
             self.reader.consume(consumed);
         }
-        Ok(option_record)
+        option_result.transpose()
     }
 
     /// Reads the next MARCXML record: looks for the next `<record>`
@@ -80,7 +84,8 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
-        let mut option_record: Option<Record> = None;
+        // Kept until the record bytes are consumed (see read_iso2709).
+        let mut option_result = None;
 
         // Locating <record>: matches the "<record" prefix, then checks
         // that the next byte is indeed a tag-name boundary (space/tab/EOL
@@ -135,7 +140,7 @@ impl<R: Read + BufRead> Reader<R> {
                             matched_end += 1;
                             if matched_end == XML_END_TAG.len() {
                                 found = true;
-                                option_record = Some(self.format.deserialize(&self.buffer)?);
+                                option_result = Some(self.format.deserialize(&self.buffer));
                                 break;
                             }
                         } else if b == XML_END_TAG[0] {
@@ -150,7 +155,7 @@ impl<R: Read + BufRead> Reader<R> {
             // 2. Tell the BufReader that `consumed` bytes have been processed
             self.reader.consume(consumed);
         }
-        Ok(option_record)
+        option_result.transpose()
     }
 
     /// Reads the next text record: accumulates bytes until a blank line
@@ -161,7 +166,8 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn read_text(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
         self.buffer.clear();
         let mut found = false;
-        let mut option_record: Option<Record> = None;
+        // Kept until the record bytes are consumed (see read_iso2709).
+        let mut option_result = None;
 
         while !found {
             let available = self.reader.fill_buf()?;
@@ -169,7 +175,7 @@ impl<R: Read + BufRead> Reader<R> {
                 // End of stream: the last record isn't followed by a
                 // blank line, decode what's left if there is any.
                 if !self.buffer.is_empty() {
-                    option_record = Some(self.format.deserialize(&self.buffer)?);
+                    option_result = Some(self.format.deserialize(&self.buffer));
                 }
                 break;
             }
@@ -181,13 +187,13 @@ impl<R: Read + BufRead> Reader<R> {
                     // Two consecutive '\n': separating blank line, not
                     // included in the record.
                     found = true;
-                    option_record = Some(self.format.deserialize(&self.buffer)?);
+                    option_result = Some(self.format.deserialize(&self.buffer));
                     break;
                 }
                 self.buffer.push(b);
             }
             self.reader.consume(consumed);
         }
-        Ok(option_record)
+        option_result.transpose()
     }
 }

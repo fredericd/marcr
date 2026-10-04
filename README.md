@@ -81,6 +81,30 @@ while let Some(record) = reader.read()? {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+`Reader::read` returns an error on a malformed record, but consumes it
+first: calling `read` again moves on to the next record. This makes it
+possible to skip unreadable records instead of stopping:
+
+```rust
+use marcr::{Format, Reader, Writer};
+use std::io::{BufReader, Cursor};
+
+let data: &[u8] = b"..."; // ISO2709-formatted records
+let mut reader = Reader::new(Format::Iso2709, BufReader::new(Cursor::new(data)));
+
+let mut writer = Writer::new(Format::Iso2709, std::io::stdout());
+loop {
+    match reader.read() {
+        Ok(Some(record)) => writer.write(&record)?,
+        Ok(None) => break,
+        // An I/O error is not tied to a record: stop there.
+        Err(err) if err.is::<std::io::Error>() => return Err(err),
+        Err(err) => eprintln!("skipped record: {err}"),
+    }
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 `Record` directly exposes its fields (`leader`, `fields`) as well as
 utility methods (`add`, `insert`) to build a record programmatically.
 
