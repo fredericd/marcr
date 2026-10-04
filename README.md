@@ -99,11 +99,15 @@ loop {
         Ok(None) => break,
         // An I/O error is not tied to a record: stop there.
         Err(err) if err.is::<std::io::Error>() => return Err(err),
-        Err(err) => eprintln!("skipped record: {err}"),
+        Err(err) => eprintln!("skipped record #{}: {err}", reader.count),
     }
 }
+eprintln!("{} records read, {} written", reader.count, writer.count);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`reader.count` is the number of records extracted from the stream so far,
+malformed ones included, and `writer.count` the number of records written.
 
 `Record` directly exposes its fields (`leader`, `fields`) as well as
 utility methods (`add`, `insert`) to build a record programmatically.

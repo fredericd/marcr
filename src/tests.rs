@@ -371,7 +371,9 @@ fn iso2709_reader_continues_after_malformed_record() {
         Ok(Some(record)) => assert_eq!(record.to_string(), expected),
         other => panic!("Expected first record, got {other:?}"),
     }
+    assert_eq!(reader.count, 1);
     assert!(reader.read().is_err(), "Expected an error on the malformed record");
+    assert_eq!(reader.count, 2, "A malformed record must be counted");
     match reader.read() {
         Ok(Some(record)) => assert_eq!(record.to_string(), expected),
         other => panic!("Expected third record, got {other:?}"),
@@ -380,4 +382,5 @@ fn iso2709_reader_continues_after_malformed_record() {
         Ok(None) => (),
         other => panic!("Expected None at end of stream, got {other:?}"),
     }
+    assert_eq!(reader.count, 3, "End of stream must not be counted");
 }

@@ -14,6 +14,8 @@ pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
     pub buffer: Vec<u8>,   // Reusable internal buffer
+    /// Number of records extracted from the stream so far, malformed ones
+    /// included: after an error, it is the number of the faulty record.
     pub count: usize,
 }
 
@@ -74,6 +76,9 @@ impl<R: Read + BufRead> Reader<R> {
                 }
             };
             self.reader.consume(consumed);
+        }
+        if option_result.is_some() {
+            self.count += 1;
         }
         option_result.transpose()
     }
@@ -155,6 +160,9 @@ impl<R: Read + BufRead> Reader<R> {
             // 2. Tell the BufReader that `consumed` bytes have been processed
             self.reader.consume(consumed);
         }
+        if option_result.is_some() {
+            self.count += 1;
+        }
         option_result.transpose()
     }
 
@@ -193,6 +201,9 @@ impl<R: Read + BufRead> Reader<R> {
                 self.buffer.push(b);
             }
             self.reader.consume(consumed);
+        }
+        if option_result.is_some() {
+            self.count += 1;
         }
         option_result.transpose()
     }
