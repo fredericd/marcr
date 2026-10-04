@@ -35,6 +35,28 @@ impl Field {
             Field::Standard(tag, _, _) => tag,
         }
     }
+
+    /// The value of the first subfield with the given `code`, or `None`
+    /// if there is none. Always `None` for a control field.
+    ///
+    /// ```
+    /// use marcr::Record;
+    ///
+    /// let mut record = Record::default();
+    /// record.insert(vec![vec!["676", "  ", "a", "843", "v", "23"]]);
+    ///
+    /// let dewey = record.field(676).and_then(|field| field.subfield('a'));
+    /// assert_eq!(dewey, Some("843"));
+    /// ```
+    pub fn subfield(&self, code: char) -> Option<&str> {
+        match self {
+            Field::Control(_, _) => None,
+            Field::Standard(_, _, subfields) => subfields
+                .iter()
+                .find(|subfield| subfield.0 == code)
+                .map(|subfield| subfield.1.as_str()),
+        }
+    }
 }
 
 impl fmt::Display for Field {

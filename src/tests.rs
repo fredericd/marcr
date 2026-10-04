@@ -316,6 +316,23 @@ fn record_fields_by_tag() {
 }
 
 #[test]
+fn field_subfield() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["001", "PPN1234"],
+        vec!["200", " 1", "a", "Titre 1", "e", "Complément", "a", "Titre 2"],
+    ]);
+    let field = record.field(200).unwrap();
+
+    // The first occurrence of a repeated code is returned.
+    assert_eq!(field.subfield('a'), Some("Titre 1"));
+    assert_eq!(field.subfield('e'), Some("Complément"));
+    assert_eq!(field.subfield('z'), None);
+    // A control field has no subfields.
+    assert_eq!(record.field(1).unwrap().subfield('a'), None);
+}
+
+#[test]
 fn record_field() {
     let mut record = Record::default();
     record.insert(vec![

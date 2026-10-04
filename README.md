@@ -140,7 +140,17 @@ match record.field(200) {
 for field in record.fields_by_tag(610) {
     println!("{field}");
 }
+
+// Value of the first $a subfield of the first 200 field
+if let Some(title) = record.field(200).and_then(|field| field.subfield('a')) {
+    println!("{title}");
+}
 ```
+
+`Field::subfield` returns the value of the first subfield with a given
+code as a `&str` borrowed from the record (`None` if there is none, or for
+a control field). Call `.to_string()` on it to keep the value beyond the
+record's lifetime.
 
 ## Tests
 
