@@ -156,4 +156,21 @@ impl Record {
             }
         }
     }
+
+    /// Returns an iterator over the fields with the given `tag`, in their
+    /// existing order.
+    pub fn fields_by_tag(&self, tag: u16) -> impl Iterator<Item = &Field> {
+        self.fields.iter().filter(move |field| *field.tag() == tag)
+    }
+
+    /// Removes all fields with the given `tag` and returns them, in their
+    /// former relative order. Fields with other tags keep their relative
+    /// order too.
+    pub fn remove_tag(&mut self, tag: u16) -> Vec<Field> {
+        let (removed, kept): (Vec<Field>, Vec<Field>) = std::mem::take(&mut self.fields)
+            .into_iter()
+            .partition(|field| *field.tag() == tag);
+        self.fields = kept;
+        removed
+    }
 }

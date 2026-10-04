@@ -293,3 +293,45 @@ fn record_insert() {
 610    $a Sujet 2");
     assert_eq!(text, expected);
 }
+
+#[test]
+fn record_fields_by_tag() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+        vec!["600", "  ", "a", "Personnage 1"],
+        vec!["001", "PPN1234"],
+    ]);
+
+    let values: Vec<&str> = record.fields_by_tag(610)
+        .map(|field| match field {
+            Field::Standard(_, _, subfields) => subfields[0].1.as_str(),
+            _ => panic!("Expected a standard field"),
+        })
+        .collect();
+    assert_eq!(values, vec!["Sujet 1", "Sujet 2"]);
+
+    assert_eq!(record.fields_by_tag(999).count(), 0);
+}
+
+#[test]
+fn record_remove_tag() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+        vec!["600", "  ", "a", "Personnage 1"],
+        vec!["001", "PPN1234"],
+    ]);
+
+    let removed = record.remove_tag(610);
+    assert_eq!(removed.len(), 2);
+    assert!(removed.iter().all(|f| *f.tag() == 610));
+    assert_eq!(record.fields_by_tag(610).count(), 0);
+    // Remaining fields keep their relative order.
+    let remaining_tags: Vec<u16> = record.fields.iter().map(|f| *f.tag()).collect();
+    assert_eq!(remaining_tags, vec![1, 600]);
+
+    assert!(record.remove_tag(999).is_empty());
+}
