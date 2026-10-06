@@ -5,34 +5,6 @@ use crate::{parse_digits, Error, Field, Record, Subfield};
 use super::Format;
 
 impl Format {
-    /// Reference, unoptimized implementation of text serialization
-    /// (assembles intermediate `String`s). Kept for comparison;
-    /// [`Format::serialize`] uses [`Format::serialize_text`].
-    pub fn serialize_text_slow(&self, record: &Record) -> Vec<u8> {
-        let mut lines: Vec<String> = Vec::new();
-        let leader = String::from_utf8_lossy(&record.leader);
-        lines.push(leader.to_string());
-        for field in record.fields.iter() {
-            match field {
-                Field::Control(tag, value) => {
-                    lines.push(format!("{tag:03} {value}"));
-                },
-                Field::Standard(tag, ind, subfields) => {
-                    let ind1 = ind[0];
-                    let ind2 = ind[1];
-                    let concatenated = subfields
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    lines.push(format!("{tag:03} {ind1}{ind2} {concatenated}"));
-                }
-            }
-        }
-        lines.push("\n".to_string());
-        lines.join("\n").into_bytes()
-    }
-
     /// Serializes `record` to human-readable text: the leader then one
     /// line per field — `tag value` (a single separator space) for a
     /// control field, `tag ind1ind2 $code value ...` for a standard field.

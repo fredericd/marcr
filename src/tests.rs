@@ -677,7 +677,7 @@ fn malformed_errors_name_their_format() {
     let cases = [
         (Format::Iso2709, &b"too short"[..], "malformed ISO 2709 record: "),
         (Format::Marcxml, &b"<record><controlfield tag=\"xyz\">1</controlfield></record>"[..], "malformed MARCXML record: "),
-        (Format::Text, &b"short leader\n"[..], "malformed text record: "),
+        (Format::Text, &b"short leader\n"[..], "malformed Text record: "),
     ];
     for (format, octets, prefix) in cases {
         let err = format.deserialize(octets).unwrap_err();

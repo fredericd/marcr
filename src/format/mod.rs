@@ -23,7 +23,7 @@ pub enum Format {
 }
 
 /// The format name, as used in error messages: `ISO 2709`, `MARCXML`
-/// or `text`.
+/// or `Text`.
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
