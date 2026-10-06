@@ -186,6 +186,27 @@ code as a `&str` borrowed from the record (`None` if there is none, or for
 a control field). Call `.to_string()` on it to keep the value beyond the
 record's lifetime.
 
+## Benchmark
+
+`bench/bench.sh` compares the `marcr` command-line tool with
+[`yaz-marcdump`](https://software.indexdata.com/yaz/) on four
+conversions, from a UTF-8 ISO 2709 file (a MARCXML copy is generated next
+to it for the MARCXML input case):
+
+```sh
+bench/bench.sh notices.mrc [RUNS]   # RUNS defaults to 3
+```
+
+Reference results on a 1 GB extract of a BnF export (717,104 records),
+Apple M5, YAZ 5.37.3, median of 3 runs, output discarded:
+
+| Conversion           | marcr   | yaz-marcdump | Peak memory (marcr / yaz) |
+|----------------------|---------|--------------|---------------------------|
+| ISO 2709 → ISO 2709  | 2.99 s  | 4.92 s       | 3.8 / 8.3 MB              |
+| ISO 2709 → MARCXML   | 9.81 s  | 13.44 s      | 4.0 / 8.3 MB              |
+| ISO 2709 → text      | 3.03 s  | 3.40 s       | 3.3 / 8.2 MB              |
+| MARCXML → ISO 2709   | 12.27 s | 25.84 s      | 3.5 / 9.2 MB              |
+
 ## Tests
 
 ```sh
@@ -207,4 +228,5 @@ src/writer.rs         Writer
 src/tests.rs          Library unit tests
 src/main.rs           Command-line interface (clap)
 tests/cli.rs          Binary integration tests
+bench/bench.sh        Benchmark against yaz-marcdump
 ```
