@@ -693,3 +693,114 @@ fn io_error_is_the_source() {
     assert!(err.is_io());
     assert!(err.source().is_some());
 }
+
+#[cfg(feature = "parallel")]
+mod parallel_tests {
+    use super::*;
+    use crate::parallel;
+
+    /// Distinct records (001 = number), several batches long, with a
+    /// malformed record and a record too long for ISO 2709 among them.
+    fn input_records() -> (Vec<u8>, usize) {
+        let mut raw = Vec::new();
+        let total = 40_000; // about 5.6 MB, more than one 4 MB batch
+        for n in 1..=total {
+            let mut record = get_default_record();
+            record.fields[0] = Field::Control(1, format!("{n:06}"));
+            if n == 25_000 {
+                record.add(Field::Standard(300, [' ', ' '], vec![Subfield('a', "x".repeat(10_000))]));
+                // Too long for ISO 2709: written as MARCXML input instead
+            }
+            let octets = Format::Marcxml.serialize(&record).unwrap();
+            raw.extend_from_slice(&octets);
+            raw.push(b'\n');
+        }
+        // A malformed record (invalid tag) between records 30000 and 30001
+        let marker = b"<controlfield tag=\"001\">030001</controlfield>";
+        let pos = raw.windows(marker.len()).position(|w| w == marker).unwrap();
+        let start = raw[..pos].windows(7).rposition(|w| w == b"<record").unwrap();
+        raw.splice(start..start, b"<record><controlfield tag=\"xyz\">1</controlfield></record>\n".iter().copied());
+        (raw, total + 1)
+    }
+
+    fn sequential(raw: &[u8], to: Format) -> (Vec<u8>, Vec<(usize, String)>) {
+        let mut reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw.to_vec()));
+        let mut writer = Writer::new(to, Vec::new());
+        let mut skipped = Vec::new();
+        for (index, result) in (&mut reader).enumerate() {
+            match result.and_then(|record| writer.write(&record)) {
+                Ok(()) => {}
+                Err(e) => skipped.push((index + 1, e.to_string())),
+            }
+        }
+        writer.finish().unwrap();
+        (std::mem::take(&mut writer.writer), skipped)
+    }
+
+    #[test]
+    fn convert_matches_sequential_output() {
+        let (raw, total) = input_records();
+        for to in [Format::Iso2709, Format::Marcxml, Format::Text] {
+            let (expected, expected_skipped) = sequential(&raw, to);
+            let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw.clone()));
+            let mut writer = Writer::new(to, Vec::new());
+            let mut skipped = Vec::new();
+            let stats = parallel::convert(reader, &mut writer, Some, |n, e| skipped.push((n, e.to_string()))).unwrap();
+            writer.finish().unwrap();
+            assert_eq!(writer.writer, expected, "{to} output differs");
+            assert_eq!(skipped, expected_skipped, "{to} skipped records differ");
+            assert_eq!(stats.read, total);
+            assert_eq!(stats.written + stats.skipped, total);
+        }
+    }
+
+    #[test]
+    fn convert_reports_errors_with_input_numbers() {
+        let (raw, _) = input_records();
+        let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw));
+        let mut writer = Writer::new(Format::Iso2709, std::io::sink());
+        let mut skipped = Vec::new();
+        let stats = parallel::convert(reader, &mut writer, Some, |n, e| skipped.push((n, e))).unwrap();
+        assert_eq!(stats.skipped, 2);
+        // Record 25000 is too long for ISO 2709, numbered 25000 in the output too
+        assert!(matches!(skipped[0], (25_000, Error::Unwritable { record: Some(25_000), .. })));
+        // The malformed record comes right after record 30000
+        assert!(matches!(skipped[1], (30_001, Error::Malformed { format: Format::Marcxml, record: Some(30_001), offset: Some(_), .. })));
+    }
+
+    #[test]
+    fn convert_filters_and_transforms() {
+        let (raw, total) = input_records();
+        let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw));
+        let mut writer = Writer::new(Format::Text, Vec::new());
+        // Keep records whose 001 is even, adding a 999 field to them
+        let stats = parallel::convert(reader, &mut writer, |mut record| {
+            let even = matches!(record.field(1), Some(Field::Control(_, n)) if n.ends_with(['0', '2', '4', '6', '8']));
+            even.then(|| {
+                record.add(Field::Standard(999, [' ', ' '], vec![Subfield('a', String::from("kept"))]));
+                record
+            })
+        }, |_, _| {}).unwrap();
+        writer.finish().unwrap();
+        let text = String::from_utf8(std::mem::take(&mut writer.writer)).unwrap();
+        assert_eq!(stats.read, total);
+        assert_eq!(stats.skipped, 1); // the malformed record; text has no length limit
+        assert_eq!(stats.written, 20_000);
+        assert_eq!(text.matches("999    $a kept").count(), stats.written);
+        assert!(text.starts_with("00146nam a2200073   4500\n001 000002\n"));
+    }
+
+    #[test]
+    fn convert_stops_on_output_io_error() {
+        struct FailingWrite;
+        impl std::io::Write for FailingWrite {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> { Err(std::io::Error::other("disk full")) }
+            fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+        }
+        let (raw, _) = input_records();
+        let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw));
+        let mut writer = Writer::new(Format::Iso2709, FailingWrite);
+        let result = parallel::convert(reader, &mut writer, Some, |_, _| {});
+        assert!(result.is_err_and(|e| e.is_io()));
+    }
+}

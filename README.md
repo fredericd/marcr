@@ -49,12 +49,18 @@ Options:
   -s, --serialize <FORMAT>    Format of the output file [default: text]
                               [possible values: iso2709, marcxml, text]
   -o, --output <NAME>         Name of the output file (stdout otherwise)
+  -j, --jobs <N>              Number of threads used to process records
+                              [default: one per core]
   -h, --help                  Print help
   -V, --version                Print version
 ```
 
 If no file is given, `marcr` reads from standard input. When several
 files are passed as arguments, they are concatenated in the output.
+
+Records are parsed and serialized on all cores (see
+[Parallel processing](#parallel-processing)); the output is the same, in
+the same order, as with a single thread (`-j 1`).
 
 A malformed record, or one that cannot be written in the output format
 (an ISO 2709 field over 9999 bytes or record over 99999 bytes), does not
@@ -98,7 +104,7 @@ the library, without pulling in `clap`, disable default features:
 
 ```toml
 [dependencies]
-marcr = { version = "0.2", default-features = false }
+marcr = { version = "0.3", default-features = false }
 ```
 
 ### Reading and writing
@@ -209,6 +215,57 @@ Things to know:
 - `Error` implements `std::error::Error`, so `?` also works in functions
   returning `Box<dyn std::error::Error>` or `anyhow::Result`.
 
+### Parallel processing
+
+With the `parallel` feature (enabled by the default `cli` feature, or
+alone with `features = ["parallel"]`), `marcr::parallel::convert` reads
+records with a `Reader`, filters and transforms them on all cores, and
+writes them with a `Writer`, in their original order:
+
+```rust
+use marcr::{Field, Format, Reader, Writer};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+
+fn main() -> Result<(), marcr::Error> {
+    let reader = Reader::new(Format::Iso2709, BufReader::new(File::open("notices.mrc")?));
+    let mut writer = Writer::new(Format::Marcxml, BufWriter::new(File::create("notices.xml")?));
+    let stats = marcr::parallel::convert(
+        reader,
+        &mut writer,
+        // Runs on several threads: keep records with a 200, add a 999 to them
+        |mut record| {
+            record.field(200)?;
+            record.add(Field::Standard(999, [' ', ' '], vec![]));
+            Some(record)
+        },
+        // Called in input order for each skipped record, with its number
+        // in the input; a Malformed error already displays it
+        |_number, error| eprintln!("skipped {error}"),
+    )?;
+    writer.finish()?;
+    eprintln!("{} read, {} written, {} skipped", stats.read, stats.written, stats.skipped);
+    Ok(())
+}
+```
+
+- The function passed as third argument filters (`None` drops the
+  record) and transforms records; it runs on several threads at once.
+- Malformed and unwritable records are passed to the last argument with
+  their number in the input, and skipped; an `Error::Io` stops processing
+  and is returned. The input number is useful for `Error::Unwritable`,
+  whose own `record` field is the number in the output.
+- The output is the same, byte for byte, as with a sequential loop over
+  `Reader::read` and `Writer::write`. Memory use stays bounded (a few
+  batches of 4 MB in flight), whatever the input size.
+- Work runs on the current [rayon](https://docs.rs/rayon) thread pool:
+  one thread per core by default, or `RAYON_NUM_THREADS`; call `convert`
+  inside `rayon::ThreadPool::install` to use a custom pool.
+
+On a 1 GB file (Apple M5, 10 cores), ISO 2709 → MARCXML takes 1.9 s
+instead of 9.5 s with one thread, ISO 2709 → ISO 2709 0.55 s instead of
+2.8 s.
+
 ### Accessing fields
 
 `Record` directly exposes its fields (`leader`, `fields`) as well as
@@ -276,14 +333,20 @@ bench/bench.sh notices.mrc [RUNS]   # RUNS defaults to 3
 ```
 
 Reference results on a 1 GB extract of a BnF export (717,104 records),
-Apple M5, YAZ 5.37.3, median of 3 runs, output discarded:
+Apple M5 (10 cores), YAZ 5.37.3, median of 3 runs, output discarded.
+`marcr` uses all cores by default, `yaz-marcdump` a single one; the
+`marcr -j 1` column gives the single-thread figures:
 
-| Conversion           | marcr   | yaz-marcdump | Peak memory (marcr / yaz) |
-|----------------------|---------|--------------|---------------------------|
-| ISO 2709 → ISO 2709  | 2.99 s  | 4.92 s       | 3.8 / 8.3 MB              |
-| ISO 2709 → MARCXML   | 9.81 s  | 13.44 s      | 4.0 / 8.3 MB              |
-| ISO 2709 → text      | 3.03 s  | 3.40 s       | 3.3 / 8.2 MB              |
-| MARCXML → ISO 2709   | 12.61 s | 25.84 s      | 3.5 / 9.2 MB              |
+| Conversion           | marcr   | marcr -j 1 | yaz-marcdump | Peak memory (marcr / yaz) |
+|----------------------|---------|------------|--------------|---------------------------|
+| ISO 2709 → ISO 2709  | 0.56 s  | 2.82 s     | 4.86 s       | 46 / 8.3 MB               |
+| ISO 2709 → MARCXML   | 1.99 s  | 9.48 s     | 13.59 s      | 68 / 8.3 MB               |
+| ISO 2709 → text      | 0.55 s  | 2.90 s     | 3.41 s       | 47 / 8.2 MB               |
+| MARCXML → ISO 2709   | 3.37 s  | 9.61 s     | 25.11 s      | 23 / 10.7 MB              |
+
+The MARCXML input is the same extract converted to MARCXML (3.4 GB).
+Memory stays bounded whatever the input size: a few 4 MB batches of
+records are in flight between threads.
 
 ## Tests
 
@@ -301,10 +364,12 @@ src/format/mod.rs     Format enum, RWDescription, serialize/deserialize dispatch
 src/format/iso2709.rs ISO 2709 (de)serialization
 src/format/marcxml.rs MARCXML (de)serialization
 src/format/text.rs    Text format (de)serialization
+src/error.rs          marcr::Error
 src/reader.rs         Reader
 src/writer.rs         Writer
 src/tests.rs          Library unit tests
 src/main.rs           Command-line interface (clap)
+src/parallel.rs       marcr::parallel, multi-core processing (feature "parallel")
 tests/cli.rs          Binary integration tests
 bench/bench.sh        Benchmark against yaz-marcdump
 ```

@@ -29,6 +29,8 @@
 
 mod error;
 mod format;
+#[cfg(feature = "parallel")]
+pub mod parallel;
 mod reader;
 mod record;
 mod writer;

@@ -48,13 +48,23 @@ impl<W: Write> Writer<W> {
             }
             e
         })?;
+        self.write_serialized(&octets)?;
+        Ok(())
+    }
+
+    /// Writes a record already serialized in `self.format`, adding the
+    /// MARCXML header or the record separator as [`Writer::write`] does.
+    pub(crate) fn write_serialized(&mut self, octets: &[u8]) -> std::io::Result<()> {
+        if self.finished {
+            return Err(std::io::Error::other("Writer already finished"));
+        }
         if self.format == Format::Marcxml && self.count == 0 {
             self.writer.write_all(XML_HEADER)?;
         }
         if self.count > 0 && (self.format == Format::Text || self.format == Format::Marcxml) {
             self.writer.write_all("\n".as_bytes())?;
         }
-        self.writer.write_all(&octets)?;
+        self.writer.write_all(octets)?;
         self.count += 1;
         Ok(())
     }

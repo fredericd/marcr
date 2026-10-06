@@ -175,3 +175,27 @@ fn empty_input_gives_valid_marcxml() {
         .stdout(predicate::str::contains("<collection>"))
         .stdout(predicate::str::contains("</collection>"));
 }
+
+#[test]
+fn jobs_option_does_not_change_output() {
+    let run = |jobs: &str| {
+        cmd()
+            .args(["-d", "marcxml", "-s", "iso2709", "-j", jobs, SAMPLE])
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone()
+    };
+    let sequential = run("1");
+    assert!(!sequential.is_empty());
+    assert_eq!(run("4"), sequential);
+}
+
+#[test]
+fn rejects_zero_jobs() {
+    cmd()
+        .args(["-d", "marcxml", "-s", "text", "-j", "0", SAMPLE])
+        .assert()
+        .failure();
+}
