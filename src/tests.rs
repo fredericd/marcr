@@ -623,5 +623,73 @@ fn reader_iterator_stops_after_io_error() {
     let reader = Reader::new(Format::Iso2709, std::io::BufReader::new(FailingRead));
     let results: Vec<_> = reader.take(5).collect();
     assert_eq!(results.len(), 1);
-    assert!(results[0].as_ref().is_err_and(|e| e.is::<std::io::Error>()));
+    assert!(results[0].as_ref().is_err_and(|e| e.is_io()));
+}
+
+#[test]
+fn reader_error_gives_record_number_and_offset() {
+    let bad = DEFAULT_ISO2709.replacen("4500001", "45000X1", 1);
+    let raw = format!("{DEFAULT_ISO2709}{bad}");
+    let first_len = DEFAULT_ISO2709.len() as u64;
+    let mut reader = Reader::new(Format::Iso2709, std::io::Cursor::new(raw.into_bytes()));
+    reader.read().unwrap();
+    let err = reader.read().unwrap_err();
+    match &err {
+        Error::Malformed { format, record, offset, message } => {
+            assert_eq!(*format, Format::Iso2709);
+            assert_eq!(*record, Some(2));
+            assert_eq!(*offset, Some(first_len));
+            assert_eq!(message, "invalid tag");
+        }
+        other => panic!("Expected Malformed, got {other:?}"),
+    }
+    assert_eq!(err.to_string(), format!("record #2 at byte {first_len}: malformed ISO 2709 record: invalid tag"));
+    assert!(!err.is_io());
+}
+
+#[test]
+fn deserialize_error_has_no_position() {
+    let err = Format::Iso2709.deserialize(b"too short").unwrap_err();
+    assert!(matches!(err, Error::Malformed { record: None, offset: None, .. }));
+    assert_eq!(err.to_string(), "malformed ISO 2709 record: record too short");
+}
+
+#[test]
+fn writer_unwritable_error_gives_format_and_record_number() {
+    let too_long = Record::new(vec![
+        Field::Standard(300, [' ', ' '], vec![Subfield('a', "x".repeat(10_000))]),
+    ]);
+    let mut writer = Writer::new(Format::Iso2709, std::io::sink());
+    writer.write(&get_default_record()).unwrap();
+    let err = writer.write(&too_long).unwrap_err();
+    match &err {
+        Error::Unwritable { format, record, .. } => {
+            assert_eq!(*format, Format::Iso2709);
+            assert_eq!(*record, Some(2));
+        }
+        other => panic!("Expected Unwritable, got {other:?}"),
+    }
+    assert!(err.to_string().starts_with("record #2: cannot write ISO 2709 record: field 300 too long"));
+}
+
+#[test]
+fn malformed_errors_name_their_format() {
+    let cases = [
+        (Format::Iso2709, &b"too short"[..], "malformed ISO 2709 record: "),
+        (Format::Marcxml, &b"<record><controlfield tag=\"xyz\">1</controlfield></record>"[..], "malformed MARCXML record: "),
+        (Format::Text, &b"short leader\n"[..], "malformed text record: "),
+    ];
+    for (format, octets, prefix) in cases {
+        let err = format.deserialize(octets).unwrap_err();
+        assert!(matches!(err, Error::Malformed { format: f, .. } if f == format), "{format}: {err:?}");
+        assert!(err.to_string().starts_with(prefix), "{format}: {err}");
+    }
+}
+
+#[test]
+fn io_error_is_the_source() {
+    use std::error::Error as _;
+    let err = Error::from(std::io::Error::other("disk full"));
+    assert!(err.is_io());
+    assert!(err.source().is_some());
 }

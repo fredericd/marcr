@@ -2,7 +2,7 @@ use std::io::Write;
 
 use memchr::memchr2;
 
-use crate::{parse_digits, Field, Record, Subfield, DE, FT, RT};
+use crate::{parse_digits, Error, Field, Record, Subfield, DE, FT, RT};
 
 use super::Format;
 
@@ -13,7 +13,7 @@ impl Format {
     ///
     /// Returns an error if a field exceeds 9999 bytes or the record 99999
     /// bytes, the limits of the 4- and 5-digit lengths of the format.
-    pub fn serialize_iso2709(&self, record: &Record) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub fn serialize_iso2709(&self, record: &Record) -> Result<Vec<u8>, Error> {
         let mut fields: Vec<u8> = Vec::new();
         let mut directory: Vec<u8> = Vec::with_capacity(record.fields.len() * 12 + 1);
         let mut from = 0;
@@ -38,7 +38,7 @@ impl Format {
             fields.push(FT);
             let len = fields.len() - start;
             if len > 9999 {
-                return Err(format!("Bad ISO2709, field {tag:03} too long ({len} bytes, max 9999)").into());
+                return Err(Error::unwritable(Format::Iso2709, format!("field {tag:03} too long ({len} bytes, max 9999)")));
             }
             write!(directory, "{tag:03}{len:04}{from:05}")?;
             from += len;
@@ -46,7 +46,7 @@ impl Format {
         let offset = 24 + 12 * record.fields.len() + 1;
         let length = offset + from + 1;
         if length > 99999 {
-            return Err(format!("Bad ISO2709, record too long ({length} bytes, max 99999)").into());
+            return Err(Error::unwritable(Format::Iso2709, format!("record too long ({length} bytes, max 99999)")));
         }
         let mut leader = record.leader;
         write!(&mut leader[..5], "{length:05}")?;
@@ -64,17 +64,18 @@ impl Format {
     /// terminated by FT/RT). Returns an error, never panics, on malformed
     /// input: record too short, non-ASCII leader, invalid directory, or a
     /// field lying outside the record.
-    pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
-        if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
-        let leader: [u8; 24] = octets[..24].try_into()?;
+    pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Error> {
+        if octets.len() < 40 { return Err(Error::malformed(Format::Iso2709, "record too short")); }
+        let leader: [u8; 24] = octets[..24].try_into()
+            .map_err(|_| Error::malformed(Format::Iso2709, "record too short"))?;
         if !leader.is_ascii() {
-            return Err("Bad ISO2709, non-ASCII leader".into());
+            return Err(Error::malformed(Format::Iso2709, "non-ASCII leader"));
         }
         let base_address = parse_digits(&octets[12..17])
-            .ok_or("Bad ISO2709, invalid leader length")?;
+            .ok_or_else(|| Error::malformed(Format::Iso2709, "invalid leader length"))?;
         // The directory runs from byte 24 up to the FT preceding the data.
         if base_address < 25 || base_address > octets.len() {
-            return Err("Bad ISO2709, base address outside the record".into());
+            return Err(Error::malformed(Format::Iso2709, "base address outside the record"));
         }
         let directory = &octets[24..base_address - 1];
         let data = &octets[base_address..];
@@ -82,22 +83,22 @@ impl Format {
         for entry in directory.chunks_exact(12) {
             let tag: u16 = parse_digits(&entry[0..3])
                 .and_then(|t| u16::try_from(t).ok())
-                .ok_or("Bad ISO2709, invalid tag")?;
+                .ok_or_else(|| Error::malformed(Format::Iso2709, "invalid tag"))?;
             let len: usize = parse_digits(&entry[3..7])
-                .ok_or("Bad ISO2709, length non digit")?;
+                .ok_or_else(|| Error::malformed(Format::Iso2709, "length non digit"))?;
             let offset: usize = parse_digits(&entry[7..12])
-                .ok_or("Bad ISO2709, invalid offset")?;
+                .ok_or_else(|| Error::malformed(Format::Iso2709, "invalid offset"))?;
             // The field with its terminating FT; `len` includes that FT.
             let field = data.get(offset..offset + len)
                 .filter(|field| !field.is_empty())
-                .ok_or("Bad ISO2709, field outside the record")?;
+                .ok_or_else(|| Error::malformed(Format::Iso2709, "field outside the record"))?;
             let field_end = len - 1; // FT excluded
             if tag < 10 {
                 let value = String::from_utf8_lossy(&field[..field_end]).into_owned();
                 fields.push(Field::Control(tag, value));
             } else {
                 if field_end < 2 {
-                    return Err("Bad ISO2709, missing indicators".into());
+                    return Err(Error::malformed(Format::Iso2709, "missing indicators"));
                 }
                 let ind: [char; 2] = [field[0] as char, field[1] as char];
                 let mut j = 2;
@@ -111,7 +112,7 @@ impl Format {
                         // subfield.
                         let k = memchr2(DE, FT, &field[j..])
                             .map(|p| j + p)
-                            .ok_or("Bad ISO2709, subfield not terminated")?;
+                            .ok_or_else(|| Error::malformed(Format::Iso2709, "subfield not terminated"))?;
                         let value = String::from_utf8_lossy(&field[j..k]).into_owned();
                         j = k;
                         subfields.push(Subfield(letter, value));

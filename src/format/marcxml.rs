@@ -6,7 +6,7 @@ use quick_xml::reader::Reader as XmlReader;
 use quick_xml::writer::Writer as XmlWriter;
 use quick_xml::XmlVersion;
 
-use crate::{Field, Record, Subfield};
+use crate::{Error, Field, Record, Subfield};
 
 use super::Format;
 
@@ -66,91 +66,98 @@ impl Format {
     /// Parses a MARCXML `<record>` element (attributes and namespace
     /// ignored; only the `leader`, `controlfield`, `datafield` and
     /// `subfield` elements are recognized). `octets` must be valid UTF-8.
-    pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
-        let xml: &str = std::str::from_utf8(octets)?;
-        let mut reader = XmlReader::from_str(xml);
-        let mut record = Record::default();
-        let mut field: Option<Field> = None;
-        let mut buf = Vec::new();
-        loop {
-            match reader.read_event_into(&mut buf)? {
-                Event::Start(e) if e.name().as_ref() == b"record" => {
-                    record = Record::default()
+    pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Error> {
+        parse_marcxml(octets).map_err(|e| Error::malformed(Format::Marcxml, e.to_string()))
+    }
+}
+
+/// Parsing of [`Format::deserialize_marcxml`]. Errors come from several
+/// sources (UTF-8, XML syntax, entities, tags) and are turned into an
+/// [`Error::Malformed`] by the caller.
+fn parse_marcxml(octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+    let xml: &str = std::str::from_utf8(octets)?;
+    let mut reader = XmlReader::from_str(xml);
+    let mut record = Record::default();
+    let mut field: Option<Field> = None;
+    let mut buf = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buf)? {
+            Event::Start(e) if e.name().as_ref() == b"record" => {
+                record = Record::default()
+            }
+            Event::Start(e) if e.name().as_ref() == b"leader" => {
+                let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
+                let leader = contenu.as_bytes();
+                if leader.len() == 24 {
+                    record.leader[..24].copy_from_slice(&leader[..24]);
                 }
-                Event::Start(e) if e.name().as_ref() == b"leader" => {
+            },
+            Event::Start(e) if e.name().as_ref() == b"controlfield" => {
+                let tag = e.attributes()
+                    .flatten()
+                    .find(|attr| attr.key.as_ref() == b"tag")
+                    .map(|attr| attr.normalized_value(XmlVersion::Implicit1_0).map(|v| v.into_owned()))
+                    .transpose()?;
+                if let Some(t) = tag {
                     let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
-                    let leader = contenu.as_bytes();
-                    if leader.len() == 24 {
-                        record.leader[..24].copy_from_slice(&leader[..24]);
-                    }
-                },
-                Event::Start(e) if e.name().as_ref() == b"controlfield" => {
-                    let tag = e.attributes()
-                        .flatten()
-                        .find(|attr| attr.key.as_ref() == b"tag")
-                        .map(|attr| attr.normalized_value(XmlVersion::Implicit1_0).map(|v| v.into_owned()))
-                        .transpose()?;
-                    if let Some(t) = tag {
-                        let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
-                        let tt: u16 = t.parse().map_err(|_| "Bad MARCXML, invalid controlfield tag")?;
-                        let cf = Field::Control(tt, contenu);
-                        record.fields.push(cf);
-                    }
-                },
-                Event::Start(e) if e.name().as_ref() == b"datafield" => {
-                    // Extract: tag, ind1, ind2
-                    let mut tag: Option<u16> = None;
-                    let mut ind1 = None;
-                    let mut ind2 = None;
-                    for attr in e.attributes().flatten() {
-                        match attr.key.as_ref() {
-                            b"tag" => tag = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.parse()
-                                .map_err(|_| "Bad MARCXML, invalid datafield tag")?),
-                            b"ind1" => ind1 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
-                            b"ind2" => ind2 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
-                            _ => ()
-                        }
-                    }
-                    if let Some(tag) = tag {
-                        let i1 = ind1.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
-                        let i2 = ind2.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
-                        let subfields = Vec::new();
-                        field = Some(Field::Standard(tag, [i1, i2], subfields));
+                    let tt: u16 = t.parse().map_err(|_| "invalid controlfield tag")?;
+                    let cf = Field::Control(tt, contenu);
+                    record.fields.push(cf);
+                }
+            },
+            Event::Start(e) if e.name().as_ref() == b"datafield" => {
+                // Extract: tag, ind1, ind2
+                let mut tag: Option<u16> = None;
+                let mut ind1 = None;
+                let mut ind2 = None;
+                for attr in e.attributes().flatten() {
+                    match attr.key.as_ref() {
+                        b"tag" => tag = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.parse()
+                            .map_err(|_| "invalid datafield tag")?),
+                        b"ind1" => ind1 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
+                        b"ind2" => ind2 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
+                        _ => ()
                     }
                 }
-                Event::Start(e) if e.name().as_ref() == b"subfield" => {
-                    // Extract: code
-                    let mut code = None;
-                    for attr in e.attributes().flatten() {
-                        match attr.key.as_ref() {
-                            b"code" => code = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
+                if let Some(tag) = tag {
+                    let i1 = ind1.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
+                    let i2 = ind2.as_deref().unwrap_or(" ").chars().next().unwrap_or(' ');
+                    let subfields = Vec::new();
+                    field = Some(Field::Standard(tag, [i1, i2], subfields));
+                }
+            }
+            Event::Start(e) if e.name().as_ref() == b"subfield" => {
+                // Extract: code
+                let mut code = None;
+                for attr in e.attributes().flatten() {
+                    match attr.key.as_ref() {
+                        b"code" => code = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
+                        _ => (),
+                    };
+                }
+                if let Some(code) = code {
+                    let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
+                    let letter = code.chars().next().unwrap_or(' ');
+                    let subfield = Subfield(letter, contenu);
+                    if let Some(f) = field.as_mut() {
+                        match f {
+                            Field::Standard(_, _, subfields) => {
+                                subfields.push(subfield);
+                            },
                             _ => (),
                         };
                     }
-                    if let Some(code) = code {
-                        let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
-                        let letter = code.chars().next().unwrap_or(' ');
-                        let subfield = Subfield(letter, contenu);
-                        if let Some(f) = field.as_mut() {
-                            match f {
-                                Field::Standard(_, _, subfields) => {
-                                    subfields.push(subfield);
-                                },
-                                _ => (),
-                            };
-                        }
-                    }
-                },
-                Event::End(e) if e.name().as_ref() == b"datafield" => {
-                    if let Some(f) = field.take() {
-                        record.fields.push(f);
-                    }
-                },
-                Event::Eof => break,
-                _ => (),
-            }
-            buf.clear();
+                }
+            },
+            Event::End(e) if e.name().as_ref() == b"datafield" => {
+                if let Some(f) = field.take() {
+                    record.fields.push(f);
+                }
+            },
+            Event::Eof => break,
+            _ => (),
         }
-        Ok(record)
+        buf.clear();
     }
+    Ok(record)
 }

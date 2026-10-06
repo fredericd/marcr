@@ -2,7 +2,7 @@ use std::io::{BufRead, Read};
 
 use memchr::memchr;
 
-use crate::{Format, Record, RT, XML_END_TAG, XML_START_PREFIX};
+use crate::{Error, Format, Record, RT, XML_END_TAG, XML_START_PREFIX};
 
 /// Reads records in sequence from a stream `R`, in a given format.
 ///
@@ -41,6 +41,8 @@ pub struct Reader<R> {
     pub count: usize,
     /// Set by the iterator after an I/O error, to stop iterating.
     io_failed: bool,
+    /// Bytes consumed from the stream so far, to locate malformed records.
+    position: u64,
 }
 
 impl<R: Read + BufRead> Reader<R> {
@@ -48,16 +50,17 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn new(format: Format, reader: R) -> Self {
         let buffer: Vec<u8> = Vec::new();
         let count = 0;
-        Self { format, reader, buffer, count, io_failed: false }
+        Self { format, reader, buffer, count, io_failed: false, position: 0 }
     }
 
     /// Reads and parses the next record from the stream.
     ///
-    /// Returns `Ok(None)` at end of stream, `Err` on a read error or a
-    /// malformed record. A malformed record is consumed from the stream
-    /// before its error is returned, so reading can go on with the next
-    /// record by calling `read` again.
-    pub fn read(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+    /// Returns `Ok(None)` at end of stream, [`Error::Io`] on a read error,
+    /// [`Error::Malformed`] on a malformed record, with its number and the
+    /// byte offset where reading of it started. A malformed record is
+    /// consumed from the stream before its error is returned, so reading
+    /// can go on with the next record by calling `read` again.
+    pub fn read(&mut self) -> Result<Option<Record>, Error> {
         match self.format {
             Format::Iso2709 => self.read_iso2709(),
             Format::Marcxml => self.read_marcxml(),
@@ -65,11 +68,21 @@ impl<R: Read + BufRead> Reader<R> {
         }
     }
 
+    /// Counts the record just extracted, if any, and locates its error.
+    fn end_read(&mut self, result: Option<Result<Record, Error>>, start: u64) -> Result<Option<Record>, Error> {
+        if result.is_some() {
+            self.count += 1;
+        }
+        let number = self.count;
+        result.map(|result| result.map_err(|e| e.at(number, start))).transpose()
+    }
+
     /// Reads the next ISO 2709 record: looks for the RT byte (`0x1d`)
     /// that terminates it in the stream, accumulating into an internal
     /// buffer if it spans several `BufReader` reads.
-    pub fn read_iso2709(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+    pub fn read_iso2709(&mut self) -> Result<Option<Record>, Error> {
         // Fallback buffer, only for records larger than the BufReader's capacity
+        let start = self.position;
         self.buffer.clear();
         let mut found = false;
         // The deserialization result is kept until the record bytes are
@@ -100,17 +113,16 @@ impl<R: Read + BufRead> Reader<R> {
                 }
             };
             self.reader.consume(consumed);
+            self.position += consumed as u64;
         }
-        if option_result.is_some() {
-            self.count += 1;
-        }
-        option_result.transpose()
+        self.end_read(option_result, start)
     }
 
     /// Reads the next MARCXML record: looks for the next `<record>`
     /// element (with or without attributes, e.g. `xmlns="..."`) then
     /// captures up to and including `</record>`.
-    pub fn read_marcxml(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+    pub fn read_marcxml(&mut self) -> Result<Option<Record>, Error> {
+        let start = self.position;
         self.buffer.clear();
         let mut found = false;
         // Kept until the record bytes are consumed (see read_iso2709).
@@ -183,11 +195,9 @@ impl<R: Read + BufRead> Reader<R> {
 
             // 2. Tell the BufReader that `consumed` bytes have been processed
             self.reader.consume(consumed);
+            self.position += consumed as u64;
         }
-        if option_result.is_some() {
-            self.count += 1;
-        }
-        option_result.transpose()
+        self.end_read(option_result, start)
     }
 
     /// Reads the next text record: accumulates bytes until a blank line
@@ -195,7 +205,8 @@ impl<R: Read + BufRead> Reader<R> {
     /// separator produced by [`crate::Writer`] for this format. The last
     /// record in the stream, not followed by a blank line, is accepted at
     /// end of stream (EOF) if there is accumulated content left.
-    pub fn read_text(&mut self) -> Result<Option<Record>, Box<dyn std::error::Error>> {
+    pub fn read_text(&mut self) -> Result<Option<Record>, Error> {
+        let start = self.position;
         self.buffer.clear();
         let mut found = false;
         // Kept until the record bytes are consumed (see read_iso2709).
@@ -225,16 +236,14 @@ impl<R: Read + BufRead> Reader<R> {
                 self.buffer.push(b);
             }
             self.reader.consume(consumed);
+            self.position += consumed as u64;
         }
-        if option_result.is_some() {
-            self.count += 1;
-        }
-        option_result.transpose()
+        self.end_read(option_result, start)
     }
 }
 
 impl<R: Read + BufRead> Iterator for Reader<R> {
-    type Item = Result<Record, Box<dyn std::error::Error>>;
+    type Item = Result<Record, Error>;
 
     /// Calls [`Reader::read`]. After an I/O error, which is not tied to a
     /// record and would likely repeat, returns `None`.
@@ -245,7 +254,7 @@ impl<R: Read + BufRead> Iterator for Reader<R> {
         match self.read() {
             Ok(record) => record.map(Ok),
             Err(e) => {
-                self.io_failed = e.is::<std::io::Error>();
+                self.io_failed = e.is_io();
                 Some(Err(e))
             }
         }

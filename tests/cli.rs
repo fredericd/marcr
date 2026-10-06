@@ -157,7 +157,7 @@ fn skips_records_too_long_for_iso2709_output() {
         .write_stdin(input)
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("skipped record #2 on output"))
+        .stderr(predicate::str::contains("<stdin>: skipped record #2: cannot write ISO 2709 record: field 300 too long"))
         .get_output()
         .stdout
         .clone();

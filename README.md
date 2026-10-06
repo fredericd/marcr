@@ -98,57 +98,118 @@ the library, without pulling in `clap`, disable default features:
 
 ```toml
 [dependencies]
-marcr = { version = "0.1", default-features = false }
+marcr = { version = "0.2", default-features = false }
 ```
+
+### Reading and writing
+
+A `Reader` reads records one by one from a buffered stream, a `Writer`
+writes them to a stream, each in a given `Format`. Neither loads the
+whole file into memory.
 
 ```rust
 use marcr::{Format, Reader, Writer};
-use std::io::{BufReader, Cursor};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 
-let data: &[u8] = b"..."; // ISO2709-formatted records
-let mut reader = Reader::new(Format::Iso2709, BufReader::new(Cursor::new(data)));
-
-let mut writer = Writer::new(Format::Marcxml, std::io::stdout());
-while let Some(record) = reader.read()? {
-    writer.write(&record)?;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let input = BufReader::new(File::open("notices.mrc")?);
+    let output = BufWriter::new(File::create("notices.xml")?);
+    let mut reader = Reader::new(Format::Iso2709, input);
+    let mut writer = Writer::new(Format::Marcxml, output);
+    while let Some(record) = reader.read()? {
+        writer.write(&record)?;
+    }
+    writer.finish()?; // closes </collection> and flushes, reporting errors
+    Ok(())
 }
-writer.finish()?; // closes </collection> and flushes, reporting errors
-# Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+This loop stops at the first error, a malformed record included; see
+[Error handling](#error-handling) to skip such records instead.
 
 Call `Writer::finish` once done: it closes the output (the MARCXML
 `</collection>`) and flushes it, returning any error. Without it, the
 output is still closed when the writer is dropped, but errors are lost.
 
-`Reader::read` returns an error on a malformed record, but consumes it
-first: calling `read` again moves on to the next record. A `Reader` is
-also an iterator over `Result<Record, _>`, which makes it easy to skip
-unreadable records instead of stopping (an I/O error ends the
-iteration):
+A `Reader` is also an iterator over `Result<Record, marcr::Error>`:
+`for result in &mut reader { ... }`. `reader.count` is the number of
+records extracted from the stream so far, malformed ones included, and
+`writer.count` the number of records written.
+
+### Error handling
+
+All fallible functions return a `marcr::Error`. Its variants tell
+whether processing can go on:
+
+| Variant | When | Context | What to do |
+|---------|------|---------|------------|
+| `Error::Io` | read or write error of the underlying stream | the `std::io::Error` | stop |
+| `Error::Malformed` | a record cannot be parsed in the input format | `format`, `record` (number in the input), `offset` (byte where reading of it started), `message` | skip the record |
+| `Error::Unwritable` | a record cannot be represented in the output format: only ISO 2709 has limits (field over 9999 bytes, record over 99999 bytes) | `format`, `record` (number in the output), `message` | skip the record |
+
+`record` and `offset` are filled in by `Reader` and `Writer`; they are
+`None` when calling `Format::deserialize` or `Format::serialize` directly.
+A malformed record is consumed before its error is returned, so the next
+`read` moves on to the following record; an I/O error ends the `Reader`
+iteration.
+
+The example below converts a file, skipping the records that cannot be
+read or written, and stopping on an I/O error:
 
 ```rust
-use marcr::{Format, Reader, Writer};
-use std::io::{BufReader, Cursor};
+use marcr::{Error, Format, Reader, Writer};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 
-let data: &[u8] = b"..."; // ISO2709-formatted records
-let mut reader = Reader::new(Format::Iso2709, BufReader::new(Cursor::new(data)));
+fn main() -> Result<(), Error> {
+    // io::Error converts into Error::Io, so `?` works on file operations
+    let input = BufReader::new(File::open("notices.mrc")?);
+    let output = BufWriter::new(File::create("notices-copy.mrc")?);
+    let mut reader = Reader::new(Format::Iso2709, input);
+    let mut writer = Writer::new(Format::Iso2709, output);
 
-let mut writer = Writer::new(Format::Iso2709, std::io::stdout());
-for (index, result) in (&mut reader).enumerate() {
-    match result {
-        Ok(record) => writer.write(&record)?,
-        // An I/O error is not tied to a record: stop there.
-        Err(err) if err.is::<std::io::Error>() => return Err(err),
-        Err(err) => eprintln!("skipped record #{}: {err}", index + 1),
+    for (index, result) in (&mut reader).enumerate() {
+        let number = index + 1;
+        let record = match result {
+            Ok(record) => record,
+            Err(Error::Malformed { format, offset, message, .. }) => {
+                // offset is always set for a record read through a Reader
+                let offset = offset.unwrap_or_default();
+                eprintln!("skipped {format} record #{number} at byte {offset}: {message}");
+                continue;
+            }
+            // Error::Io, or a variant added in a later version: stop
+            Err(e) => return Err(e),
+        };
+        match writer.write(&record) {
+            Ok(()) => {}
+            // The record is still at hand, to identify it as needed
+            Err(Error::Unwritable { message, .. }) => {
+                eprintln!("record #{number} not written: {message}");
+            }
+            Err(e) => return Err(e),
+        }
     }
+    writer.finish()?;
+    eprintln!("{} records read, {} written", reader.count, writer.count);
+    Ok(())
 }
-writer.finish()?;
-eprintln!("{} records read, {} written", reader.count, writer.count);
-# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`reader.count` is the number of records extracted from the stream so far,
-malformed ones included, and `writer.count` the number of records written.
+Things to know:
+
+- `Error` and its `Malformed` and `Unwritable` variants are
+  `#[non_exhaustive]`, so that variants and fields can be added without
+  breaking your code: a `match` on `Error` needs a catch-all arm, and a
+  variant pattern must end with `..`.
+- `Error` displays as a full sentence, e.g. `record #12 at byte 4096:
+  malformed ISO 2709 record: invalid tag`, and `error.is_io()` tells an
+  I/O error apart.
+- `Error` implements `std::error::Error`, so `?` also works in functions
+  returning `Box<dyn std::error::Error>` or `anyhow::Result`.
+
+### Accessing fields
 
 `Record` directly exposes its fields (`leader`, `fields`) as well as
 utility methods (`add`, `insert`) to build a record programmatically.
@@ -159,39 +220,41 @@ and `remove_tag` removes and returns them. `field_mut` and
 `fields_by_tag_mut` give mutable access to modify fields in place:
 
 ```rust
-use marcr::{Field, Record};
+use marcr::{Field, Record, Subfield};
 
-let mut record = Record::default();
-record.insert(vec![
-    vec!["001", "PPN1234"],
-    vec!["200", " 1", "a", "Mon titre"],
-    vec!["610", "  ", "a", "Sujet 1"],
-    vec!["610", "  ", "a", "Sujet 2"],
-]);
+fn main() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["001", "PPN1234"],
+        vec!["200", " 1", "a", "Mon titre"],
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+    ]);
 
-// First occurrence of a tag
-match record.field(200) {
-    Some(Field::Standard(_, indicators, subfields)) => {
-        println!("200 {indicators:?}: {}", subfields[0].1);
+    // First occurrence of a tag
+    match record.field(200) {
+        Some(Field::Standard(_, indicators, subfields)) => {
+            println!("200 {indicators:?}: {}", subfields[0].1);
+        }
+        Some(Field::Control(_, value)) => println!("{value}"), // tags 001-009
+        None => println!("no 200 field"),
     }
-    Some(Field::Control(_, value)) => println!("{value}"), // tags 001-009
-    None => println!("no 200 field"),
-}
 
-// All occurrences of a tag
-for field in record.fields_by_tag(610) {
-    println!("{field}");
-}
+    // All occurrences of a tag
+    for field in record.fields_by_tag(610) {
+        println!("{field}");
+    }
 
-// Value of the first $a subfield of the first 200 field
-if let Some(title) = record.field(200).and_then(|field| field.subfield('a')) {
-    println!("{title}");
-}
+    // Value of the first $a subfield of the first 200 field
+    if let Some(title) = record.field(200).and_then(|field| field.subfield('a')) {
+        println!("{title}");
+    }
 
-// Add a $2 subfield to every 610 field
-for field in record.fields_by_tag_mut(610) {
-    if let Field::Standard(_, _, subfields) = field {
-        subfields.push(marcr::Subfield('2', String::from("rameau")));
+    // Add a $2 subfield to every 610 field
+    for field in record.fields_by_tag_mut(610) {
+        if let Field::Standard(_, _, subfields) = field {
+            subfields.push(Subfield('2', String::from("rameau")));
+        }
     }
 }
 ```

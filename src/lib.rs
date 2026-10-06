@@ -27,11 +27,13 @@
 //! # }
 //! ```
 
+mod error;
 mod format;
 mod reader;
 mod record;
 mod writer;
 
+pub use error::Error;
 pub use format::{Format, RWDescription};
 pub use reader::Reader;
 pub use record::{Field, Record, Subfield};

@@ -54,7 +54,7 @@ fn write_to(
     reader: Reader<Box<dyn BufRead>>,
     writer: &mut Writer<Box<dyn Write>>,
     source: &str,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<usize, marcr::Error> {
     let mut skipped = 0;
     // One item per record, so the index gives the record number.
     for (index, result) in reader.enumerate() {
@@ -62,17 +62,19 @@ fn write_to(
         match result {
             Ok(record) => match writer.write(&record) {
                 Ok(()) => (),
-                Err(e) if e.is::<io::Error>() => return Err(e),
-                Err(e) => {
+                // Reported with the record number in the input
+                Err(marcr::Error::Unwritable { format, message, .. }) => {
                     skipped += 1;
-                    eprintln!("{source}: skipped record #{number} on output: {e}");
+                    eprintln!("{source}: skipped record #{number}: cannot write {format} record: {message}");
                 }
+                Err(e) => return Err(e),
             },
             // An I/O error is not tied to one record: stop there.
-            Err(e) if e.is::<io::Error>() => return Err(e),
+            Err(e @ marcr::Error::Io(_)) => return Err(e),
+            // "record #N at byte X: malformed ... record: ..."
             Err(e) => {
                 skipped += 1;
-                eprintln!("{source}: skipped record #{number}: {e}");
+                eprintln!("{source}: skipped {e}");
             }
         }
     }

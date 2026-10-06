@@ -1,4 +1,6 @@
-use crate::Record;
+use std::fmt;
+
+use crate::{Error, Record};
 
 mod iso2709;
 mod marcxml;
@@ -6,7 +8,7 @@ mod text;
 
 /// A MARC record format, used for (de)serialization via
 /// [`Format::serialize`]/[`Format::deserialize`] or by [`crate::Reader`]/[`crate::Writer`].
-#[derive(PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
   /// ISO 2709 binary exchange format (`.mrc` extension). Reading and
   /// writing supported.
@@ -18,6 +20,18 @@ pub enum Format {
   /// Reading and writing supported; [`crate::Reader`] splits records on a
   /// blank line (the separator produced by [`crate::Writer`] for this format).
   Text,
+}
+
+/// The format name, as used in error messages: `ISO 2709`, `MARCXML`
+/// or `text`.
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Format::Iso2709 => "ISO 2709",
+            Format::Marcxml => "MARCXML",
+            Format::Text => "text",
+        })
+    }
 }
 
 /// Descriptive metadata for a [`Format`], useful for example to populate
@@ -57,7 +71,7 @@ impl Format {
     /// in sequence from a larger stream.
     ///
     /// Returns an error if `octets` is not a valid record in this format.
-    pub fn deserialize(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
+    pub fn deserialize(&self, octets: &[u8]) -> Result<Record, Error> {
         match self {
             Format::Iso2709 => self.deserialize_iso2709(octets),
             Format::Marcxml => self.deserialize_marcxml(octets),
@@ -70,7 +84,7 @@ impl Format {
     ///
     /// Only ISO 2709 can fail, on a record exceeding the format's length
     /// limits (see [`Format::serialize_iso2709`]).
-    pub fn serialize(&self, record: &Record) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    pub fn serialize(&self, record: &Record) -> Result<Vec<u8>, Error> {
         match self {
             Format::Iso2709 => self.serialize_iso2709(record),
             Format::Marcxml => Ok(self.serialize_marcxml(record)),

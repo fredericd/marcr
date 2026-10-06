@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::{parse_digits, Field, Record, Subfield};
+use crate::{parse_digits, Error, Field, Record, Subfield};
 
 use super::Format;
 
@@ -74,30 +74,31 @@ impl Format {
     /// The text format has no escaping mechanism: a subfield value
     /// literally containing `" $"` followed by a character will be
     /// misinterpreted as the start of a new subfield.
-    pub fn deserialize_text(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
-        let text = std::str::from_utf8(octets)?;
+    pub fn deserialize_text(&self, octets: &[u8]) -> Result<Record, Error> {
+        let text = std::str::from_utf8(octets)
+            .map_err(|e| Error::malformed(Format::Text, e.to_string()))?;
         let mut lines = text.lines();
 
-        let leader_line = lines.next().ok_or("Bad text record: missing leader")?;
+        let leader_line = lines.next().ok_or_else(|| Error::malformed(Format::Text, "missing leader"))?;
         let leader: [u8; 24] = leader_line.as_bytes().try_into()
-            .map_err(|_| "Bad text record: invalid leader length")?;
+            .map_err(|_| Error::malformed(Format::Text, "invalid leader length"))?;
 
         let mut fields = Vec::new();
         for line in lines {
             if line.is_empty() { continue; }
             if line.len() < 3 {
-                return Err("Bad text record: field line too short".into());
+                return Err(Error::malformed(Format::Text, "field line too short"));
             }
             let bytes = line.as_bytes();
             let tag: u16 = parse_digits(&bytes[..3])
                 .and_then(|t| u16::try_from(t).ok())
-                .ok_or("Bad text record: invalid tag")?;
+                .ok_or_else(|| Error::malformed(Format::Text, "invalid tag"))?;
 
             if tag < 10 {
                 // "tag value": a single separator space (no indicators
                 // for a control field).
                 if bytes.get(3) != Some(&b' ') {
-                    return Err("Bad text record: missing separator after tag".into());
+                    return Err(Error::malformed(Format::Text, "missing separator after tag"));
                 }
                 fields.push(Field::Control(tag, line[4..].to_string()));
             } else {
@@ -105,18 +106,18 @@ impl Format {
                 // (7 characters before the subfields), the two indicators
                 // cannot act as a separator.
                 if line.len() < 7 || !line.is_char_boundary(7) {
-                    return Err("Bad text record: field line too short".into());
+                    return Err(Error::malformed(Format::Text, "field line too short"));
                 }
                 let ind: [char; 2] = [bytes[4] as char, bytes[5] as char];
                 let rest = &line[7..];
                 let mut subfields = Vec::new();
                 if !rest.is_empty() {
                     let body = rest.strip_prefix('$')
-                        .ok_or("Bad text record: malformed subfield")?;
+                        .ok_or_else(|| Error::malformed(Format::Text, "malformed subfield"))?;
                     for chunk in body.split(" $") {
                         let mut chars = chunk.chars();
                         let code = chars.next()
-                            .ok_or("Bad text record: missing subfield code")?;
+                            .ok_or_else(|| Error::malformed(Format::Text, "missing subfield code"))?;
                         let value = chars.as_str().strip_prefix(' ').unwrap_or(chars.as_str());
                         subfields.push(Subfield(code, value.to_string()));
                     }

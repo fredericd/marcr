@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::{Format, Record};
+use crate::{Error, Format, Record};
 
 /// XML prologue and opening of the enclosing element, for [`Format::Marcxml`].
 const XML_HEADER: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collection>\n";
@@ -34,14 +34,20 @@ impl<W: Write> Writer<W> {
     /// Serializes and writes `record` to the stream.
     ///
     /// A record that cannot be serialized (see [`Format::serialize`]) is
-    /// rejected with an error before anything is written, so writing can
-    /// go on with the next record. Returns an error once
-    /// [`Writer::finish`] has been called.
-    pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+    /// rejected with an [`Error::Unwritable`], giving its number in the
+    /// output, before anything is written, so writing can go on with the
+    /// next record (which the caller still has at hand to identify it).
+    /// Returns an [`Error::Io`] once [`Writer::finish`] has been called.
+    pub fn write(&mut self, record: &Record) -> Result<(), Error> {
         if self.finished {
-            return Err("Writer already finished".into());
+            return Err(Error::Io(std::io::Error::other("Writer already finished")));
         }
-        let octets = self.format.serialize(record)?;
+        let octets = self.format.serialize(record).map_err(|mut e| {
+            if let Error::Unwritable { record, .. } = &mut e {
+                *record = Some(self.count + 1);
+            }
+            e
+        })?;
         if self.format == Format::Marcxml && self.count == 0 {
             self.writer.write_all(XML_HEADER)?;
         }
