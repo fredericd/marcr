@@ -9,14 +9,18 @@ const XML_HEADER: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collect
 ///
 /// For [`Format::Marcxml`], the XML prologue and the enclosing
 /// `<collection>` element are written automatically (opened on the first
-/// [`Writer::write`], closed on the `Writer`'s [`Drop`]; an empty but
-/// valid collection is written if no record was); for [`Format::Text`]
-/// and [`Format::Marcxml`], successive records are separated by a blank
-/// line.
+/// [`Writer::write`], closed by [`Writer::finish`]; an empty but valid
+/// collection is written if no record was); for [`Format::Text`] and
+/// [`Format::Marcxml`], successive records are separated by a blank line.
+///
+/// Call [`Writer::finish`] once done, to close the output and get any
+/// error. If it is not called, the output is closed on [`Drop`], where
+/// errors cannot be reported.
 pub struct Writer<W: Write> {
     pub format: Format,
     pub writer: W,
     pub count: usize,
+    finished: bool,
 }
 
 impl<W: Write> Writer<W> {
@@ -24,15 +28,19 @@ impl<W: Write> Writer<W> {
     /// Creates a writer for `format` on top of the stream `writer`.
     pub fn new(format: Format, writer: W) -> Self {
         let count = 0;
-        Self { format, writer, count }
+        Self { format, writer, count, finished: false }
     }
 
     /// Serializes and writes `record` to the stream.
     ///
     /// A record that cannot be serialized (see [`Format::serialize`]) is
     /// rejected with an error before anything is written, so writing can
-    /// go on with the next record.
+    /// go on with the next record. Returns an error once
+    /// [`Writer::finish`] has been called.
     pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
+        if self.finished {
+            return Err("Writer already finished".into());
+        }
         let octets = self.format.serialize(record)?;
         if self.format == Format::Marcxml && self.count == 0 {
             self.writer.write_all(XML_HEADER)?;
@@ -44,15 +52,37 @@ impl<W: Write> Writer<W> {
         self.count += 1;
         Ok(())
     }
+
+    /// Closes the output: writes the closing `</collection>` for
+    /// [`Format::Marcxml`], then flushes the stream. Returns the first
+    /// write or flush error, which [`Drop`] would silently ignore. Calling
+    /// it again does nothing.
+    pub fn finish(&mut self) -> std::io::Result<()> {
+        if self.finished {
+            return Ok(());
+        }
+        // Set first, so that Drop does not retry after an error.
+        self.finished = true;
+        self.close()?;
+        self.writer.flush()
+    }
+
+    /// Writes what ends the output in the current format.
+    fn close(&mut self) -> std::io::Result<()> {
+        if self.format == Format::Marcxml {
+            if self.count == 0 {
+                self.writer.write_all(XML_HEADER)?;
+            }
+            self.writer.write_all("\n</collection>\n".as_bytes())?;
+        }
+        Ok(())
+    }
 }
 
 impl<W: Write> Drop for Writer<W> {
     fn drop(&mut self) {
-        if self.format == Format::Marcxml {
-            if self.count == 0 {
-                let _ = self.writer.write_all(XML_HEADER);
-            }
-            let _ = self.writer.write_all("\n</collection>\n".as_bytes());
+        if !self.finished {
+            let _ = self.close();
         }
     }
 }

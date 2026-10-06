@@ -51,27 +51,28 @@ struct Args {
 /// read, or written in the output format, are reported on stderr and
 /// skipped; returns how many were skipped.
 fn write_to(
-    mut reader: Reader<Box<dyn BufRead>>,
+    reader: Reader<Box<dyn BufRead>>,
     writer: &mut Writer<Box<dyn Write>>,
     source: &str,
 ) -> Result<usize, Box<dyn Error>> {
     let mut skipped = 0;
-    loop {
-        match reader.read() {
-            Ok(Some(record)) => match writer.write(&record) {
+    // One item per record, so the index gives the record number.
+    for (index, result) in reader.enumerate() {
+        let number = index + 1;
+        match result {
+            Ok(record) => match writer.write(&record) {
                 Ok(()) => (),
                 Err(e) if e.is::<io::Error>() => return Err(e),
                 Err(e) => {
                     skipped += 1;
-                    eprintln!("{source}: skipped record #{} on output: {e}", reader.count);
+                    eprintln!("{source}: skipped record #{number} on output: {e}");
                 }
             },
-            Ok(None) => break,
             // An I/O error is not tied to one record: stop there.
             Err(e) if e.is::<io::Error>() => return Err(e),
             Err(e) => {
                 skipped += 1;
-                eprintln!("{source}: skipped record #{}: {e}", reader.count);
+                eprintln!("{source}: skipped record #{number}: {e}");
             }
         }
     }
@@ -115,9 +116,7 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         let reader = Reader::new(get_format(args.deserialize), buf_reader);
         skipped += write_to(reader, &mut writer, "<stdin>")?;
     }
-    // Report write errors instead of losing them when the buffer is
-    // flushed on drop.
-    writer.writer.flush()?;
+    writer.finish()?;
 
     if skipped > 0 {
         eprintln!("{} records written, {skipped} skipped", writer.count);

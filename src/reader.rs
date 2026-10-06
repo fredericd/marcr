@@ -10,6 +10,28 @@ use crate::{Format, Record, RT, XML_END_TAG, XML_START_PREFIX};
 /// without loading the whole stream into memory. For `format: Text`,
 /// records must be separated by a blank line (which is what
 /// [`crate::Writer`] produces for this format).
+///
+/// A `Reader` is also an [`Iterator`] over `Result<Record, _>`: a
+/// malformed record yields an `Err` and iteration goes on with the next
+/// one, while an I/O error ends the iteration after being yielded.
+///
+/// ```no_run
+/// use marcr::{Format, Reader};
+/// use std::io::BufReader;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let input = BufReader::new(std::fs::File::open("notices.mrc")?);
+/// let mut reader = Reader::new(Format::Iso2709, input);
+/// for result in &mut reader {
+///     match result {
+///         Ok(record) => println!("{record}"),
+///         Err(e) => eprintln!("skipped record: {e}"),
+///     }
+/// }
+/// eprintln!("{} records read", reader.count);
+/// # Ok(())
+/// # }
+/// ```
 pub struct Reader<R> {
     pub format: Format,
     pub reader: R,
@@ -17,6 +39,8 @@ pub struct Reader<R> {
     /// Number of records extracted from the stream so far, malformed ones
     /// included: after an error, it is the number of the faulty record.
     pub count: usize,
+    /// Set by the iterator after an I/O error, to stop iterating.
+    io_failed: bool,
 }
 
 impl<R: Read + BufRead> Reader<R> {
@@ -24,7 +48,7 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn new(format: Format, reader: R) -> Self {
         let buffer: Vec<u8> = Vec::new();
         let count = 0;
-        Self { format, reader, buffer, count }
+        Self { format, reader, buffer, count, io_failed: false }
     }
 
     /// Reads and parses the next record from the stream.
@@ -206,5 +230,24 @@ impl<R: Read + BufRead> Reader<R> {
             self.count += 1;
         }
         option_result.transpose()
+    }
+}
+
+impl<R: Read + BufRead> Iterator for Reader<R> {
+    type Item = Result<Record, Box<dyn std::error::Error>>;
+
+    /// Calls [`Reader::read`]. After an I/O error, which is not tied to a
+    /// record and would likely repeat, returns `None`.
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.io_failed {
+            return None;
+        }
+        match self.read() {
+            Ok(record) => record.map(Ok),
+            Err(e) => {
+                self.io_failed = e.is::<std::io::Error>();
+                Some(Err(e))
+            }
+        }
     }
 }

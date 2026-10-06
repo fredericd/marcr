@@ -568,3 +568,60 @@ fn marcxml_reader_resolves_entities_and_character_references() {
     assert!(matches!(record.field(1), Some(Field::Control(_, value)) if value == "A&B"));
     assert_eq!(record.field(245).unwrap().subfield('a'), Some(r#"<café> "x" 'y'"#));
 }
+
+#[test]
+fn writer_finish_closes_marcxml_once() {
+    let mut output = Vec::new();
+    {
+        let mut writer = Writer::new(Format::Marcxml, &mut output);
+        writer.write(&get_default_record()).unwrap();
+        writer.finish().unwrap();
+        writer.finish().unwrap(); // no-op
+        assert!(writer.write(&get_default_record()).is_err(), "write after finish must fail");
+    } // Drop must not close the collection a second time
+    let xml = String::from_utf8(output).unwrap();
+    assert_eq!(xml.matches("</collection>").count(), 1);
+    assert_eq!(xml.matches("<record>").count(), 1);
+}
+
+#[test]
+fn writer_finish_reports_flush_errors() {
+    struct FailingFlush;
+    impl std::io::Write for FailingFlush {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> { Ok(buf.len()) }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::Error::other("disk full"))
+        }
+    }
+    let mut writer = Writer::new(Format::Iso2709, FailingFlush);
+    writer.write(&get_default_record()).unwrap();
+    assert!(writer.finish().is_err());
+}
+
+#[test]
+fn reader_iterator_skips_malformed_records() {
+    let bad = DEFAULT_ISO2709.replacen("4500001", "45000X1", 1);
+    let raw = format!("{DEFAULT_ISO2709}{bad}{DEFAULT_ISO2709}");
+    let mut reader = Reader::new(Format::Iso2709, std::io::Cursor::new(raw.into_bytes()));
+    let results: Vec<_> = (&mut reader).collect();
+    assert_eq!(results.len(), 3);
+    assert!(results[0].is_ok());
+    assert!(results[1].is_err());
+    assert!(results[2].is_ok());
+    assert_eq!(reader.count, 3);
+}
+
+#[test]
+fn reader_iterator_stops_after_io_error() {
+    // A stream that always fails: the iterator yields the error once, then ends.
+    struct FailingRead;
+    impl std::io::Read for FailingRead {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("device error"))
+        }
+    }
+    let reader = Reader::new(Format::Iso2709, std::io::BufReader::new(FailingRead));
+    let results: Vec<_> = reader.take(5).collect();
+    assert_eq!(results.len(), 1);
+    assert!(results[0].as_ref().is_err_and(|e| e.is::<std::io::Error>()));
+}

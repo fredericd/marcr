@@ -112,12 +112,19 @@ let mut writer = Writer::new(Format::Marcxml, std::io::stdout());
 while let Some(record) = reader.read()? {
     writer.write(&record)?;
 }
+writer.finish()?; // closes </collection> and flushes, reporting errors
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+Call `Writer::finish` once done: it closes the output (the MARCXML
+`</collection>`) and flushes it, returning any error. Without it, the
+output is still closed when the writer is dropped, but errors are lost.
+
 `Reader::read` returns an error on a malformed record, but consumes it
-first: calling `read` again moves on to the next record. This makes it
-possible to skip unreadable records instead of stopping:
+first: calling `read` again moves on to the next record. A `Reader` is
+also an iterator over `Result<Record, _>`, which makes it easy to skip
+unreadable records instead of stopping (an I/O error ends the
+iteration):
 
 ```rust
 use marcr::{Format, Reader, Writer};
@@ -127,15 +134,15 @@ let data: &[u8] = b"..."; // ISO2709-formatted records
 let mut reader = Reader::new(Format::Iso2709, BufReader::new(Cursor::new(data)));
 
 let mut writer = Writer::new(Format::Iso2709, std::io::stdout());
-loop {
-    match reader.read() {
-        Ok(Some(record)) => writer.write(&record)?,
-        Ok(None) => break,
+for (index, result) in (&mut reader).enumerate() {
+    match result {
+        Ok(record) => writer.write(&record)?,
         // An I/O error is not tied to a record: stop there.
         Err(err) if err.is::<std::io::Error>() => return Err(err),
-        Err(err) => eprintln!("skipped record #{}: {err}", reader.count),
+        Err(err) => eprintln!("skipped record #{}: {err}", index + 1),
     }
 }
+writer.finish()?;
 eprintln!("{} records read, {} written", reader.count, writer.count);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
