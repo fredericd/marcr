@@ -131,7 +131,7 @@ fn skips_malformed_records_and_keeps_going() {
         .args(["-d", "iso2709", "-s", "marcxml"])
         .write_stdin(input)
         .assert()
-        .success()
+        .code(2)
         .stderr(predicate::str::contains("<stdin>: skipped record #2"))
         .stderr(predicate::str::contains("2 records written, 1 skipped"))
         .get_output()
@@ -141,4 +141,37 @@ fn skips_malformed_records_and_keeps_going() {
     assert_eq!(output.matches("<record>").count(), 2);
     // The output is complete: the collection is closed.
     assert!(output.trim_end().ends_with("</collection>"));
+}
+
+#[test]
+fn skips_records_too_long_for_iso2709_output() {
+    let record = |value: &str| format!(
+        "<record><leader>00000nam a2200000   4500</leader>\
+         <datafield tag=\"300\" ind1=\" \" ind2=\" \"><subfield code=\"a\">{value}</subfield></datafield>\
+         </record>"
+    );
+    let input = format!("<collection>{}{}{}</collection>", record("ok"), record(&"x".repeat(10_000)), record("ok"));
+
+    let output = cmd()
+        .args(["-d", "marcxml", "-s", "iso2709"])
+        .write_stdin(input)
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("skipped record #2 on output"))
+        .get_output()
+        .stdout
+        .clone();
+    // Two records, each terminated by RT (0x1d)
+    assert_eq!(output.iter().filter(|&&b| b == 0x1d).count(), 2);
+}
+
+#[test]
+fn empty_input_gives_valid_marcxml() {
+    cmd()
+        .args(["-d", "iso2709", "-s", "marcxml"])
+        .write_stdin("")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("<collection>"))
+        .stdout(predicate::str::contains("</collection>"));
 }

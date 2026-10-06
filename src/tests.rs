@@ -96,7 +96,7 @@ fn text_reader_control_field_single_space_separator() {
 fn text_roundtrip() {
     // serialize_text() then deserialize_text() should yield the same record.
     let record = get_default_record();
-    let octets = Format::Text.serialize(&record);
+    let octets = Format::Text.serialize(&record).unwrap();
     let parsed = Format::Text.deserialize(&octets)
         .expect("Text deserialization failed");
     assert_eq!(parsed.to_string(), record.to_string());
@@ -134,7 +134,7 @@ fn text_reader_empty_subfields() {
     // kept, empty subfield list): serializing then deserializing avoids
     // hand-writing a fragile string full of spaces.
     let record = Record::new(vec![Field::Standard(200, [' ', ' '], vec![])]);
-    let octets = Format::Text.serialize(&record);
+    let octets = Format::Text.serialize(&record).unwrap();
     let parsed = Format::Text.deserialize(&octets)
         .expect("Text deserialization failed");
     match &parsed.fields[0] {
@@ -500,4 +500,47 @@ fn marcxml_malformed_records_return_errors() {
     assert!(Format::Marcxml.deserialize(invalid_controlfield_tag.as_bytes()).is_err());
     assert!(Format::Marcxml.deserialize(invalid_datafield_tag.as_bytes()).is_err());
     assert!(Format::Marcxml.deserialize(&invalid_utf8).is_err());
+}
+
+#[test]
+fn iso2709_serialize_rejects_oversized_records() {
+    // A field longer than 9999 bytes cannot be described in the directory.
+    let long_field = Record::new(vec![
+        Field::Standard(300, [' ', ' '], vec![Subfield('a', "x".repeat(10_000))]),
+    ]);
+    assert!(Format::Iso2709.serialize(&long_field).is_err());
+
+    // Each field fits, but the record exceeds 99999 bytes.
+    let fields: Vec<Field> = (0..11)
+        .map(|_| Field::Standard(300, [' ', ' '], vec![Subfield('a', "x".repeat(9_900))]))
+        .collect();
+    assert!(Format::Iso2709.serialize(&Record::new(fields)).is_err());
+
+    assert!(Format::Iso2709.serialize(&get_default_record()).is_ok());
+}
+
+#[test]
+fn writer_rejects_record_without_writing_anything() {
+    let too_long = Record::new(vec![
+        Field::Standard(300, [' ', ' '], vec![Subfield('a', "x".repeat(10_000))]),
+    ]);
+    let mut writer = Writer::new(Format::Iso2709, std::io::Cursor::new(Vec::new()));
+    writer.write(&get_default_record()).unwrap();
+    assert!(writer.write(&too_long).is_err());
+    writer.write(&get_default_record()).unwrap();
+    assert_eq!(writer.count, 2);
+
+    let octets = writer.writer.get_ref().clone();
+    let expected = Format::Iso2709.serialize(&get_default_record()).unwrap().repeat(2);
+    assert_eq!(octets, expected);
+}
+
+#[test]
+fn marcxml_writer_without_records_is_valid_xml() {
+    let mut output = Vec::new();
+    drop(Writer::new(Format::Marcxml, &mut output));
+    let xml = String::from_utf8(output).unwrap();
+    assert!(xml.starts_with("<?xml"));
+    assert!(xml.contains("<collection>"));
+    assert!(xml.trim_end().ends_with("</collection>"));
 }

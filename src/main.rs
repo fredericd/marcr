@@ -5,6 +5,7 @@ use std::fmt;
 use marcr::{ Format, Writer, Reader };
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum ArgFormat {
@@ -27,6 +28,7 @@ impl fmt::Display for ArgFormat {
 /// Read/write MARC biblio records files in various formats
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
+#[command(after_help = "Exit status: 0 on success, 2 if malformed records were skipped, 1 on error.")]
 struct Args {
     /// Format of the input files
     #[arg(short, long, value_name = "FORMAT", default_value_t = ArgFormat::Iso2709)]
@@ -45,8 +47,9 @@ struct Args {
     files: Vec<PathBuf>,
 }
 
-/// Copies every record of `reader` to `writer`. Malformed records are
-/// reported on stderr and skipped; returns how many were skipped.
+/// Copies every record of `reader` to `writer`. Records that cannot be
+/// read, or written in the output format, are reported on stderr and
+/// skipped; returns how many were skipped.
 fn write_to(
     mut reader: Reader<Box<dyn BufRead>>,
     writer: &mut Writer<Box<dyn Write>>,
@@ -55,7 +58,14 @@ fn write_to(
     let mut skipped = 0;
     loop {
         match reader.read() {
-            Ok(Some(record)) => writer.write(&record)?,
+            Ok(Some(record)) => match writer.write(&record) {
+                Ok(()) => (),
+                Err(e) if e.is::<io::Error>() => return Err(e),
+                Err(e) => {
+                    skipped += 1;
+                    eprintln!("{source}: skipped record #{} on output: {e}", reader.count);
+                }
+            },
             Ok(None) => break,
             // An I/O error is not tied to one record: stop there.
             Err(e) if e.is::<io::Error>() => return Err(e),
@@ -68,7 +78,7 @@ fn write_to(
     Ok(skipped)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<ExitCode, Box<dyn Error>> {
     let args = Args::parse();
 
     let get_format = |format| -> Format {
@@ -111,7 +121,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if skipped > 0 {
         eprintln!("{} records written, {skipped} skipped", writer.count);
+        return Ok(ExitCode::from(2));
     }
-    Ok(())
+    Ok(ExitCode::SUCCESS)
 }
 

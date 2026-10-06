@@ -67,11 +67,14 @@ impl Format {
 
     /// Serializes `record` according to `self`. To write several records
     /// to a stream (MARCXML header/footer, separators), prefer [`crate::Writer`].
-    pub fn serialize(&self, record: &Record) -> Vec<u8> {
+    ///
+    /// Only ISO 2709 can fail, on a record exceeding the format's length
+    /// limits (see [`Format::serialize_iso2709`]).
+    pub fn serialize(&self, record: &Record) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         match self {
             Format::Iso2709 => self.serialize_iso2709(record),
-            Format::Marcxml => self.serialize_marcxml(record),
-            Format::Text => self.serialize_text(record),
+            Format::Marcxml => Ok(self.serialize_marcxml(record)),
+            Format::Text => Ok(self.serialize_text(record)),
         }
     }
 }

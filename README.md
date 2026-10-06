@@ -38,6 +38,14 @@ Options:
 If no file is given, `marcr` reads from standard input. When several
 files are passed as arguments, they are concatenated in the output.
 
+A malformed record, or one that cannot be written in the output format
+(an ISO 2709 field over 9999 bytes or record over 99999 bytes), does not
+stop the conversion: it is reported on standard error with its number in
+the input file, and skipped.
+
+Exit status: `0` on success, `2` if records were skipped, `1` on error
+(missing file, read or write failure).
+
 ### Examples
 
 Convert an ISO2709 file to MARCXML:

@@ -10,7 +10,10 @@ impl Format {
     /// Serializes `record` to ISO 2709: leader, directory, then fields
     /// terminated by FT (`0x1e`), the whole terminated by RT (`0x1d`).
     /// Recomputes the data length and offset in the leader.
-    pub fn serialize_iso2709(&self, record: &Record) -> Vec<u8> {
+    ///
+    /// Returns an error if a field exceeds 9999 bytes or the record 99999
+    /// bytes, the limits of the 4- and 5-digit lengths of the format.
+    pub fn serialize_iso2709(&self, record: &Record) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         let mut fields: Vec<u8> = Vec::new();
         let mut directory: Vec<u8> = Vec::with_capacity(record.fields.len() * 12 + 1);
         let mut from = 0;
@@ -34,21 +37,27 @@ impl Format {
             };
             fields.push(FT);
             let len = fields.len() - start;
-            write!(directory, "{tag:03}{len:04}{from:05}").unwrap();
+            if len > 9999 {
+                return Err(format!("Bad ISO2709, field {tag:03} too long ({len} bytes, max 9999)").into());
+            }
+            write!(directory, "{tag:03}{len:04}{from:05}")?;
             from += len;
         }
         let offset = 24 + 12 * record.fields.len() + 1;
         let length = offset + from + 1;
+        if length > 99999 {
+            return Err(format!("Bad ISO2709, record too long ({length} bytes, max 99999)").into());
+        }
         let mut leader = record.leader;
-        write!(&mut leader[..5], "{length:05}").unwrap();
-        write!(&mut leader[12..17], "{offset:05}").unwrap();
+        write!(&mut leader[..5], "{length:05}")?;
+        write!(&mut leader[12..17], "{offset:05}")?;
         directory.push(FT);
         fields.push(RT);
         let mut data: Vec<u8> = Vec::with_capacity(leader.len() + directory.len() + fields.len());
         data.extend_from_slice(&leader);
         data.extend_from_slice(&directory);
         data.extend_from_slice(&fields);
-        data
+        Ok(data)
     }
 
     /// Parses a complete ISO 2709 record (leader + directory + fields
