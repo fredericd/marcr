@@ -9,6 +9,24 @@ records, converting between three formats:
 - **Text** (`text`) — a human-readable representation, one line per
   field.
 
+## Character encoding
+
+`marcr` works with **UTF-8 only**: input data must be UTF-8 encoded, and
+everything it writes is UTF-8. Other MARC encodings (MARC-8, ISO 5426,
+ISO 8859-1…) are not converted; convert such files to UTF-8 beforehand
+(with `yaz-marcdump` for instance).
+
+Non-UTF-8 input is handled differently depending on the format:
+
+- **ISO 2709**: invalid bytes are replaced by the replacement character
+  `�` (U+FFFD), **without any warning**; the record is otherwise read.
+- **MARCXML** and **text**: the record is rejected as malformed (reported
+  and skipped by the command-line tool).
+
+The leader's character coding position (09) is neither checked on input
+nor updated on output; records created from scratch get the default
+leader `00000nam a2200000   4500`, whose position 09 is `a` (UCS/Unicode).
+
 ## Build
 
 ```sh
