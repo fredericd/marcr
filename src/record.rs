@@ -155,21 +155,16 @@ impl Record {
                 }
                 else if tag <= 999 {
                     if len < 4 { continue; }
-                    let ind_str = a_a[1];
-                    let mut iter = ind_str.chars();
-                    let ind: [char; 2] = [
-                        iter.next().expect("Missing first character"),
-                        iter.next().expect("Missing second character"),
-                    ];
+                    let mut iter = a_a[1].chars();
+                    let (Some(ind1), Some(ind2)) = (iter.next(), iter.next()) else {
+                        continue; // fewer than two indicators
+                    };
+                    let ind: [char; 2] = [ind1, ind2];
                     let mut subfields: Vec<Subfield> = Vec::new();
                     for i in (2..len-1).step_by(2) {
-                        let letter_str = a_a[i];
                         let value_str = a_a[i+1];
-                        if letter_str.len() >= 1 && value_str.len() > 1 {
-                            let mut iter = letter_str.chars();
-                            let letter = iter.next().expect("Not a letter for subfield");
-                            let value = String::from(value_str);
-                            subfields.push(Subfield(letter, value));
+                        if let Some(letter) = a_a[i].chars().next() && !value_str.is_empty() {
+                            subfields.push(Subfield(letter, String::from(value_str)));
                         }
                     }
                     let field = Field::Standard(tag, ind, subfields);
@@ -200,20 +195,40 @@ impl Record {
         self.fields.iter().find(|field| *field.tag() == tag)
     }
 
+    /// Mutable counterpart of [`Record::field`]: returns the first field
+    /// with the given `tag`, to modify it in place.
+    ///
+    /// ```
+    /// use marcr::{Field, Record, Subfield};
+    ///
+    /// let mut record = Record::default();
+    /// record.insert(vec![vec!["200", " 1", "a", "Mon titre"]]);
+    ///
+    /// if let Some(Field::Standard(_, _, subfields)) = record.field_mut(200) {
+    ///     subfields.push(Subfield('e', String::from("Complément")));
+    /// }
+    /// assert_eq!(record.field(200).unwrap().subfield('e'), Some("Complément"));
+    /// ```
+    pub fn field_mut(&mut self, tag: u16) -> Option<&mut Field> {
+        self.fields.iter_mut().find(|field| *field.tag() == tag)
+    }
+
     /// Returns an iterator over the fields with the given `tag`, in their
     /// existing order.
     pub fn fields_by_tag(&self, tag: u16) -> impl Iterator<Item = &Field> {
         self.fields.iter().filter(move |field| *field.tag() == tag)
     }
 
+    /// Mutable counterpart of [`Record::fields_by_tag`]: iterates over the
+    /// fields with the given `tag`, to modify them in place.
+    pub fn fields_by_tag_mut(&mut self, tag: u16) -> impl Iterator<Item = &mut Field> {
+        self.fields.iter_mut().filter(move |field| *field.tag() == tag)
+    }
+
     /// Removes all fields with the given `tag` and returns them, in their
     /// former relative order. Fields with other tags keep their relative
-    /// order too.
+    /// order too. Done in place: only the removed fields are moved.
     pub fn remove_tag(&mut self, tag: u16) -> Vec<Field> {
-        let (removed, kept): (Vec<Field>, Vec<Field>) = std::mem::take(&mut self.fields)
-            .into_iter()
-            .partition(|field| *field.tag() == tag);
-        self.fields = kept;
-        removed
+        self.fields.extract_if(.., |field| *field.tag() == tag).collect()
     }
 }

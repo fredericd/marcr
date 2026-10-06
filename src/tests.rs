@@ -375,6 +375,65 @@ fn record_remove_tag() {
 }
 
 #[test]
+fn record_insert_single_char_value_and_short_indicators() {
+    let mut record = Record::default();
+    record.insert(vec![
+        // A one-character value must be kept.
+        vec!["995", "  ", "r", "X"],
+        // Fewer than two indicators: entry ignored, no panic.
+        vec!["200", "1", "a", "Titre"],
+    ]);
+    assert_eq!(record.fields.len(), 1);
+    assert_eq!(record.field(995).unwrap().subfield('r'), Some("X"));
+}
+
+#[test]
+fn record_field_mut() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["001", "PPN1234"],
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+    ]);
+
+    // Only the first occurrence is modified.
+    if let Some(Field::Standard(_, ind, _)) = record.field_mut(610) {
+        ind[0] = '1';
+    }
+    let indicators: Vec<char> = record.fields_by_tag(610)
+        .map(|field| match field {
+            Field::Standard(_, ind, _) => ind[0],
+            _ => panic!("Expected a standard field"),
+        })
+        .collect();
+    assert_eq!(indicators, vec!['1', ' ']);
+
+    if let Some(Field::Control(_, value)) = record.field_mut(1) {
+        value.push_str("X");
+    }
+    assert!(matches!(record.field(1), Some(Field::Control(_, value)) if value == "PPN1234X"));
+    assert!(record.field_mut(999).is_none());
+}
+
+#[test]
+fn record_fields_by_tag_mut() {
+    let mut record = Record::default();
+    record.insert(vec![
+        vec!["610", "  ", "a", "Sujet 1"],
+        vec!["600", "  ", "a", "Personnage 1"],
+        vec!["610", "  ", "a", "Sujet 2"],
+    ]);
+
+    for field in record.fields_by_tag_mut(610) {
+        if let Field::Standard(_, _, subfields) = field {
+            subfields.push(Subfield('2', String::from("rameau")));
+        }
+    }
+    assert!(record.fields_by_tag(610).all(|field| field.subfield('2') == Some("rameau")));
+    assert_eq!(record.field(600).unwrap().subfield('2'), None);
+}
+
+#[test]
 fn iso2709_reader_continues_after_malformed_record() {
     // A malformed record must yield an error without blocking the stream:
     // the next call to read() returns the following record.

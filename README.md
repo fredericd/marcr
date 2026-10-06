@@ -114,7 +114,8 @@ utility methods (`add`, `insert`) to build a record programmatically.
 
 To access fields by tag, `field` returns the first field with a given
 tag (`None` if there is none), `fields_by_tag` iterates over all of them,
-and `remove_tag` removes and returns them:
+and `remove_tag` removes and returns them. `field_mut` and
+`fields_by_tag_mut` give mutable access to modify fields in place:
 
 ```rust
 use marcr::{Field, Record};
@@ -144,6 +145,13 @@ for field in record.fields_by_tag(610) {
 // Value of the first $a subfield of the first 200 field
 if let Some(title) = record.field(200).and_then(|field| field.subfield('a')) {
     println!("{title}");
+}
+
+// Add a $2 subfield to every 610 field
+for field in record.fields_by_tag_mut(610) {
+    if let Field::Standard(_, _, subfields) = field {
+        subfields.push(marcr::Subfield('2', String::from("rameau")));
+    }
 }
 ```
 
