@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::str;
 
 use crate::{parse_digits, Field, Record, Subfield};
 
@@ -11,7 +10,7 @@ impl Format {
     /// [`Format::serialize`] uses [`Format::serialize_text`].
     pub fn serialize_text_slow(&self, record: &Record) -> Vec<u8> {
         let mut lines: Vec<String> = Vec::new();
-        let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
+        let leader = String::from_utf8_lossy(&record.leader);
         lines.push(leader.to_string());
         for field in record.fields.iter() {
             match field {
@@ -39,7 +38,7 @@ impl Format {
     /// control field, `tag ind1ind2 $code value ...` for a standard field.
     pub fn serialize_text(&self, record: &Record) -> Vec<u8> {
         let mut buffer: Vec<u8> = Vec::new();
-        let leader = unsafe { str::from_utf8_unchecked(&record.leader) };
+        let leader = String::from_utf8_lossy(&record.leader);
         write!(buffer, "{}\n", leader).unwrap();
         for field in record.fields.iter() {
             match field {

@@ -52,48 +52,58 @@ impl Format {
     }
 
     /// Parses a complete ISO 2709 record (leader + directory + fields
-    /// terminated by FT/RT). Returns an error if `octets` is shorter than
-    /// 40 bytes or if the directory is malformed.
+    /// terminated by FT/RT). Returns an error, never panics, on malformed
+    /// input: record too short, non-ASCII leader, invalid directory, or a
+    /// field lying outside the record.
     pub fn deserialize_iso2709(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
         if octets.len() < 40 { return Err("Invalid record. Too short".into()); }
-        let leader: [u8; 24] = octets[..24].try_into().unwrap();
-        let directory_len = parse_digits(&octets[12..17])
+        let leader: [u8; 24] = octets[..24].try_into()?;
+        if !leader.is_ascii() {
+            return Err("Bad ISO2709, non-ASCII leader".into());
+        }
+        let base_address = parse_digits(&octets[12..17])
             .ok_or("Bad ISO2709, invalid leader length")?;
-        let number_of_tags = (directory_len - 24 - 1) / 12;
-        let mut fields: Vec<Field> = Vec::with_capacity(number_of_tags);
-        for i in 0..number_of_tags {
-            let directory_offset = 24 + i * 12;
-            let tag: u16 = parse_digits(&octets[directory_offset..directory_offset+3])
+        // The directory runs from byte 24 up to the FT preceding the data.
+        if base_address < 25 || base_address > octets.len() {
+            return Err("Bad ISO2709, base address outside the record".into());
+        }
+        let directory = &octets[24..base_address - 1];
+        let data = &octets[base_address..];
+        let mut fields: Vec<Field> = Vec::with_capacity(directory.len() / 12);
+        for entry in directory.chunks_exact(12) {
+            let tag: u16 = parse_digits(&entry[0..3])
                 .and_then(|t| u16::try_from(t).ok())
                 .ok_or("Bad ISO2709, invalid tag")?;
-            let len: usize = parse_digits(&octets[directory_offset+3..directory_offset+3+4])
-                .ok_or("Bad ISO2709, length non digit")? - 1;
-            let offset: usize = parse_digits(&octets[directory_offset+3+4..directory_offset+3+4+5])
+            let len: usize = parse_digits(&entry[3..7])
+                .ok_or("Bad ISO2709, length non digit")?;
+            let offset: usize = parse_digits(&entry[7..12])
                 .ok_or("Bad ISO2709, invalid offset")?;
-            let base = directory_len + offset;
+            // The field with its terminating FT; `len` includes that FT.
+            let field = data.get(offset..offset + len)
+                .filter(|field| !field.is_empty())
+                .ok_or("Bad ISO2709, field outside the record")?;
+            let field_end = len - 1; // FT excluded
             if tag < 10 {
-                let slice = &octets[base..base + len];
-                let value = String::from_utf8_lossy(slice).into_owned();
+                let value = String::from_utf8_lossy(&field[..field_end]).into_owned();
                 fields.push(Field::Control(tag, value));
             } else {
-                let ind: [char; 2] = [octets[base] as char, octets[base+1] as char];
-                let mut j = base + 2;
-                let field_end = base + len;
-                // +1: the bound includes the FT byte terminating the last
-                // subfield (excluded from `field_end`, which stops the loop
-                // *before* that FT).
-                let scan_end = field_end + 1;
+                if field_end < 2 {
+                    return Err("Bad ISO2709, missing indicators".into());
+                }
+                let ind: [char; 2] = [field[0] as char, field[1] as char];
+                let mut j = 2;
                 let mut subfields: Vec<Subfield> = Vec::with_capacity(3);
                 while j < field_end {
-                    if octets[j] == DE {
-                        j += 1;
-                        let letter: char = octets[j] as char;
-                        j += 1;
-                        let k = memchr2(DE, FT, &octets[j..scan_end])
+                    if field[j] == DE {
+                        // j + 1 <= field_end < field.len(): always in bounds
+                        let letter: char = field[j + 1] as char;
+                        j += 2;
+                        // The search includes the FT terminating the last
+                        // subfield.
+                        let k = memchr2(DE, FT, &field[j..])
                             .map(|p| j + p)
                             .ok_or("Bad ISO2709, subfield not terminated")?;
-                        let slice = &octets[j..k];
-                        let value = String::from_utf8_lossy(slice).into_owned();
+                        let value = String::from_utf8_lossy(&field[j..k]).into_owned();
                         j = k;
                         subfields.push(Subfield(letter, value));
                     }

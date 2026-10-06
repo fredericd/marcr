@@ -90,7 +90,7 @@ pub struct Record {
 
 impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let leader: &str = unsafe { str::from_utf8_unchecked(&self.leader) };
+        let leader = String::from_utf8_lossy(&self.leader);
         let text = self.fields
             .iter()
             .map(|s| s.to_string())

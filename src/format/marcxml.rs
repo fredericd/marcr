@@ -18,10 +18,10 @@ impl Format {
         match xml_writer
             .create_element("record")
             .write_inner_content(|writer| {
-                let leader_str: &str = unsafe { str::from_utf8_unchecked(&record.leader) };
+                let leader_str = String::from_utf8_lossy(&record.leader);
                 writer
                     .create_element("leader")
-                    .write_text_content(BytesText::new(leader_str))?;
+                    .write_text_content(BytesText::new(&leader_str))?;
                 for field in record.fields.iter() {
                     match field {
                         Field::Control(tag, value) => {
@@ -65,7 +65,7 @@ impl Format {
     /// ignored; only the `leader`, `controlfield`, `datafield` and
     /// `subfield` elements are recognized). `octets` must be valid UTF-8.
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
-        let xml: &str = unsafe { str::from_utf8_unchecked(octets) };
+        let xml: &str = std::str::from_utf8(octets)?;
         let mut reader = XmlReader::from_str(xml);
         let mut record = Record::default();
         let mut field: Option<Field> = None;
@@ -89,7 +89,7 @@ impl Format {
                         .map(|attr| String::from_utf8_lossy(&attr.value).into_owned());
                     if let Some(t) = tag {
                         let contenu = reader.read_text(e.name())?.decode()?.to_string();
-                        let tt: u16 = t.parse().unwrap();
+                        let tt: u16 = t.parse().map_err(|_| "Bad MARCXML, invalid controlfield tag")?;
                         let cf = Field::Control(tt, contenu);
                         record.fields.push(cf);
                     }
@@ -101,7 +101,8 @@ impl Format {
                     let mut ind2 = None;
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
-                            b"tag" => tag = Some(String::from_utf8_lossy(&attr.value).into_owned().parse().unwrap()),
+                            b"tag" => tag = Some(String::from_utf8_lossy(&attr.value).parse()
+                                .map_err(|_| "Bad MARCXML, invalid datafield tag")?),
                             b"ind1" => ind1 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
                             b"ind2" => ind2 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
                             _ => ()

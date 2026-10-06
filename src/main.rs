@@ -45,24 +45,27 @@ struct Args {
     files: Vec<PathBuf>,
 }
 
+/// Copies every record of `reader` to `writer`. Malformed records are
+/// reported on stderr and skipped; returns how many were skipped.
 fn write_to(
     mut reader: Reader<Box<dyn BufRead>>,
-    writer: &mut Writer<Box<dyn Write>>
-) -> Result<(), Box<dyn Error>> {
-    loop { 
-        let result = reader.read();
-        match result {
-            Ok(record) => {
-                let _ = match record {
-                    Some(record) => writer.write(&record),
-                    None => { break; },
-                };
-                ()
-            },
-            Err(e) => panic!("{e}"),
-        };
+    writer: &mut Writer<Box<dyn Write>>,
+    source: &str,
+) -> Result<usize, Box<dyn Error>> {
+    let mut skipped = 0;
+    loop {
+        match reader.read() {
+            Ok(Some(record)) => writer.write(&record)?,
+            Ok(None) => break,
+            // An I/O error is not tied to one record: stop there.
+            Err(e) if e.is::<io::Error>() => return Err(e),
+            Err(e) => {
+                skipped += 1;
+                eprintln!("{source}: skipped record #{}: {e}", reader.count);
+            }
+        }
     }
-    Ok(())
+    Ok(skipped)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -88,20 +91,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let output_format = get_format(args.serialize);
     let mut writer = Writer::new(output_format, buf_writer);
+    let mut skipped = 0;
     if args.files.len() > 0 {
         for file in &args.files {
             let input_file = File::open(&file)?;
             let buf_reader: Box<dyn BufRead> = Box::new(BufReader::with_capacity(128 * 1024, input_file));
             let reader = Reader::new(get_format(args.deserialize), buf_reader);
-            write_to(reader, &mut writer)?;
+            skipped += write_to(reader, &mut writer, &file.display().to_string())?;
         }
     } else {
         let stdin = io::stdin();
         let buf_reader: Box<dyn BufRead> = Box::new(BufReader::with_capacity(128 * 1024, stdin.lock()));
         let reader = Reader::new(get_format(args.deserialize), buf_reader);
-        write_to(reader, &mut writer)?;
+        skipped += write_to(reader, &mut writer, "<stdin>")?;
     }
+    // Report write errors instead of losing them when the buffer is
+    // flushed on drop.
+    writer.writer.flush()?;
 
+    if skipped > 0 {
+        eprintln!("{} records written, {skipped} skipped", writer.count);
+    }
     Ok(())
 }
 

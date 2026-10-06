@@ -26,13 +26,13 @@ impl<W: Write> Writer<W> {
     /// Serializes and writes `record` to the stream.
     pub fn write(&mut self, record: &Record) -> Result<(), Box<dyn std::error::Error>> {
         if self.format == Format::Marcxml && self.count == 0 {
-            self.writer.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collection>\n".as_bytes())?;
+            self.writer.write_all("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collection>\n".as_bytes())?;
         }
         if self.count > 0 && (self.format == Format::Text || self.format == Format::Marcxml) {
-            self.writer.write("\n".as_bytes())?;
+            self.writer.write_all("\n".as_bytes())?;
         }
         let octets = self.format.serialize(record);
-        self.writer.write(&octets)?;
+        self.writer.write_all(&octets)?;
         self.count += 1;
         Ok(())
     }
@@ -41,7 +41,7 @@ impl<W: Write> Writer<W> {
 impl<W: Write> Drop for Writer<W> {
     fn drop(&mut self) {
         if self.format == Format::Marcxml {
-            let _ = self.writer.write("\n</collection>\n".as_bytes());
+            let _ = self.writer.write_all("\n</collection>\n".as_bytes());
         }
     }
 }

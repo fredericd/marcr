@@ -119,3 +119,26 @@ fn errors_on_missing_input_file() {
         .assert()
         .failure();
 }
+
+#[test]
+fn skips_malformed_records_and_keeps_going() {
+    // good, malformed (invalid tag in the directory), good
+    let good = "00146nam a2200073   4500001000700000005000500007200003600012700002400048\u{1e}000001\u{1e}2026\u{1e} 1\u{1f}aMon titre\u{1f}eComplément du titre\u{1e} 1\u{1f}aDemians\u{1f}bFrédéric\u{1e}\u{1d}";
+    let bad = good.replacen("4500001", "45000X1", 1);
+    let input = format!("{good}{bad}{good}");
+
+    let output = cmd()
+        .args(["-d", "iso2709", "-s", "marcxml"])
+        .write_stdin(input)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("<stdin>: skipped record #2"))
+        .stderr(predicate::str::contains("2 records written, 1 skipped"))
+        .get_output()
+        .stdout
+        .clone();
+    let output = String::from_utf8(output).unwrap();
+    assert_eq!(output.matches("<record>").count(), 2);
+    // The output is complete: the collection is closed.
+    assert!(output.trim_end().ends_with("</collection>"));
+}

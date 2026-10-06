@@ -460,3 +460,44 @@ fn iso2709_reader_continues_after_malformed_record() {
     }
     assert_eq!(reader.count, 3, "End of stream must not be counted");
 }
+
+const DEFAULT_ISO2709: &str = "00146nam a2200073   4500001000700000005000500007200003600012700002400048\u{1e}000001\u{1e}2026\u{1e} 1\u{1f}aMon titre\u{1f}eComplément du titre\u{1e} 1\u{1f}aDemians\u{1f}bFrédéric\u{1e}\u{1d}";
+
+#[test]
+fn iso2709_malformed_records_return_errors() {
+    // Each corruption must yield an Err, never a panic.
+    let corrupt = |from: &str, to: &str| -> Vec<u8> {
+        assert!(DEFAULT_ISO2709.contains(from));
+        DEFAULT_ISO2709.replacen(from, to, 1).into_bytes()
+    };
+    let mut non_ascii_leader = DEFAULT_ISO2709.as_bytes().to_vec();
+    non_ascii_leader[5] = 0xff;
+    let cases: Vec<(&str, Vec<u8>)> = vec![
+        ("base address before the directory end", corrupt("a2200073", "a2200010")),
+        ("base address beyond the record", corrupt("a2200073", "a2299999")),
+        ("field offset beyond the record", corrupt("700002400048", "700002409999")),
+        ("field length beyond the record", corrupt("700002400048", "700999900048")),
+        ("zero field length", corrupt("001000700000", "001000000000")),
+        ("missing indicators", corrupt("200003600012", "200000100012")),
+        ("delimiter as last byte of a field", corrupt("200003600012", "200001500012")),
+        ("non-ASCII leader", non_ascii_leader),
+    ];
+    for (name, octets) in cases {
+        assert!(Format::Iso2709.deserialize(&octets).is_err(), "Expected an error: {name}");
+    }
+    // The untouched record still parses.
+    assert!(Format::Iso2709.deserialize(DEFAULT_ISO2709.as_bytes()).is_ok());
+}
+
+#[test]
+fn marcxml_malformed_records_return_errors() {
+    let invalid_controlfield_tag = "<record><controlfield tag=\"xyz\">1</controlfield></record>";
+    let invalid_datafield_tag = "<record><datafield tag=\"xyz\" ind1=\" \" ind2=\" \"></datafield></record>";
+    let mut invalid_utf8 = b"<record><controlfield tag=\"001\">".to_vec();
+    invalid_utf8.extend_from_slice(&[0xff, 0xfe]);
+    invalid_utf8.extend_from_slice(b"</controlfield></record>");
+
+    assert!(Format::Marcxml.deserialize(invalid_controlfield_tag.as_bytes()).is_err());
+    assert!(Format::Marcxml.deserialize(invalid_datafield_tag.as_bytes()).is_err());
+    assert!(Format::Marcxml.deserialize(&invalid_utf8).is_err());
+}
