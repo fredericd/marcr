@@ -213,7 +213,7 @@ Apple M5, YAZ 5.37.3, median of 3 runs, output discarded:
 | ISO 2709 → ISO 2709  | 2.99 s  | 4.92 s       | 3.8 / 8.3 MB              |
 | ISO 2709 → MARCXML   | 9.81 s  | 13.44 s      | 4.0 / 8.3 MB              |
 | ISO 2709 → text      | 3.03 s  | 3.40 s       | 3.3 / 8.2 MB              |
-| MARCXML → ISO 2709   | 12.27 s | 25.84 s      | 3.5 / 9.2 MB              |
+| MARCXML → ISO 2709   | 12.61 s | 25.84 s      | 3.5 / 9.2 MB              |
 
 ## Tests
 

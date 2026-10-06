@@ -1,8 +1,10 @@
 use std::str;
 
+use quick_xml::escape::unescape;
 use quick_xml::events::{BytesText, Event};
 use quick_xml::reader::Reader as XmlReader;
 use quick_xml::writer::Writer as XmlWriter;
+use quick_xml::XmlVersion;
 
 use crate::{Field, Record, Subfield};
 
@@ -76,7 +78,7 @@ impl Format {
                     record = Record::default()
                 }
                 Event::Start(e) if e.name().as_ref() == b"leader" => {
-                    let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                    let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
                     let leader = contenu.as_bytes();
                     if leader.len() == 24 {
                         record.leader[..24].copy_from_slice(&leader[..24]);
@@ -86,9 +88,10 @@ impl Format {
                     let tag = e.attributes()
                         .flatten()
                         .find(|attr| attr.key.as_ref() == b"tag")
-                        .map(|attr| String::from_utf8_lossy(&attr.value).into_owned());
+                        .map(|attr| attr.normalized_value(XmlVersion::Implicit1_0).map(|v| v.into_owned()))
+                        .transpose()?;
                     if let Some(t) = tag {
-                        let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                        let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
                         let tt: u16 = t.parse().map_err(|_| "Bad MARCXML, invalid controlfield tag")?;
                         let cf = Field::Control(tt, contenu);
                         record.fields.push(cf);
@@ -101,10 +104,10 @@ impl Format {
                     let mut ind2 = None;
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
-                            b"tag" => tag = Some(String::from_utf8_lossy(&attr.value).parse()
+                            b"tag" => tag = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.parse()
                                 .map_err(|_| "Bad MARCXML, invalid datafield tag")?),
-                            b"ind1" => ind1 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
-                            b"ind2" => ind2 = Some(String::from_utf8_lossy(&attr.value).into_owned()),
+                            b"ind1" => ind1 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
+                            b"ind2" => ind2 = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
                             _ => ()
                         }
                     }
@@ -120,12 +123,12 @@ impl Format {
                     let mut code = None;
                     for attr in e.attributes().flatten() {
                         match attr.key.as_ref() {
-                            b"code" => code = Some(String::from_utf8_lossy(&attr.value).into_owned()),
+                            b"code" => code = Some(attr.normalized_value(XmlVersion::Implicit1_0)?.into_owned()),
                             _ => (),
                         };
                     }
                     if let Some(code) = code {
-                        let contenu = reader.read_text(e.name())?.decode()?.to_string();
+                        let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
                         let letter = code.chars().next().unwrap_or(' ');
                         let subfield = Subfield(letter, contenu);
                         if let Some(f) = field.as_mut() {

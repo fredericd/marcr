@@ -544,3 +544,27 @@ fn marcxml_writer_without_records_is_valid_xml() {
     assert!(xml.contains("<collection>"));
     assert!(xml.trim_end().ends_with("</collection>"));
 }
+
+#[test]
+fn marcxml_roundtrip_preserves_special_characters() {
+    // Characters escaped as entities in XML must come back unchanged.
+    let value = r#"Fish & chips <"quoted"> l'été"#;
+    let record = Record::new(vec![
+        Field::Control(1, String::from("A&B")),
+        Field::Standard(245, [' ', ' '], vec![Subfield('a', String::from(value))]),
+    ]);
+    let octets = Format::Marcxml.serialize(&record).unwrap();
+    let parsed = Format::Marcxml.deserialize(&octets).unwrap();
+    assert_eq!(parsed.to_string(), record.to_string());
+}
+
+#[test]
+fn marcxml_reader_resolves_entities_and_character_references() {
+    let xml = "<record><controlfield tag=\"001\">A&amp;B</controlfield>\
+               <datafield tag=\"245\" ind1=\"1\" ind2=\"0\">\
+               <subfield code=\"a\">&lt;caf&#233;&gt; &quot;x&quot; &apos;y&apos;</subfield>\
+               </datafield></record>";
+    let record = Format::Marcxml.deserialize(xml.as_bytes()).unwrap();
+    assert!(matches!(record.field(1), Some(Field::Control(_, value)) if value == "A&B"));
+    assert_eq!(record.field(245).unwrap().subfield('a'), Some(r#"<café> "x" 'y'"#));
+}
