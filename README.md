@@ -93,6 +93,14 @@ marcr -d iso2709 -s iso2709 -o merged.mrc a.mrc b.mrc c.mrc
 
 ## Library usage
 
+The command-line tool is behind the default `cli` feature. To use only
+the library, without pulling in `clap`, disable default features:
+
+```toml
+[dependencies]
+marcr = { version = "0.1", default-features = false }
+```
+
 ```rust
 use marcr::{Format, Reader, Writer};
 use std::io::{BufReader, Cursor};

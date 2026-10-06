@@ -5,15 +5,32 @@ edition = "2024"
 rust-version = "1.88"
 description = "Read and write MARC bibliographic records in ISO 2709, MARCXML and text formats"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/fredericd/marcr"
 readme = "README.md"
 keywords = ["marc", "marcxml", "iso2709", "bibliographic", "library"]
 categories = ["parsing", "encoding"]
 include = ["src/**", "README.md", "LICENSE-MIT", "LICENSE-APACHE"]
 
+[features]
+default = ["cli"]
+# The marcr command-line tool; library users can opt out with
+# default-features = false to avoid pulling in clap.
+cli = ["dep:clap"]
+
 [dependencies]
 quick-xml = "0.41"
 memchr = "2.7"
-clap = { version = "4.6.6", features = ["derive"] }
+clap = { version = "4.6.6", features = ["derive"], optional = true }
+
+[[bin]]
+name = "marcr"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+required-features = ["cli"]
 
 [profile.release]
 debug = true
