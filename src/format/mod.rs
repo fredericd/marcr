@@ -29,7 +29,7 @@ impl fmt::Display for Format {
         f.write_str(match self {
             Format::Iso2709 => "ISO 2709",
             Format::Marcxml => "MARCXML",
-            Format::Text => "text",
+            Format::Text => "Text",
         })
     }
 }
@@ -55,7 +55,7 @@ impl Format {
             },
             RWDescription{
                 format: Format::Marcxml,
-                description: String::from("Marc XML"),
+                description: String::from("MARCXML"),
                 extension: String::from("xml"),
             },
             RWDescription{
