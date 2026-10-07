@@ -323,7 +323,8 @@ record's lifetime.
 
 ## Benchmark
 
-`bench/bench.sh` compares the `marcr` command-line tool with
+`bench/bench.sh` compares the `marcr` command-line tool, on all cores and
+on a single one (`-j 1`), with
 [`yaz-marcdump`](https://software.indexdata.com/yaz/) on four
 conversions, from a UTF-8 ISO 2709 file (a MARCXML copy is generated next
 to it for the MARCXML input case):
@@ -334,15 +335,17 @@ bench/bench.sh notices.mrc [RUNS]   # RUNS defaults to 3
 
 Reference results on a 1 GB extract of a BnF export (717,104 records),
 Apple M5 (10 cores), YAZ 5.37.3, median of 3 runs, output discarded.
-`marcr` uses all cores by default, `yaz-marcdump` a single one; the
-`marcr -j 1` column gives the single-thread figures:
+`yaz-marcdump` runs on a single core; `marcr` is measured on a single
+thread (`-j 1`) and on all cores (its default). Each cell gives the
+processing time, the speedup over `yaz-marcdump` (its time divided by
+marcr's) and the peak memory:
 
-| Conversion           | marcr   | marcr -j 1 | yaz-marcdump | Peak memory (marcr / yaz) |
-|----------------------|---------|------------|--------------|---------------------------|
-| ISO 2709 → ISO 2709  | 0.56 s  | 2.82 s     | 4.86 s       | 46 / 8.3 MB               |
-| ISO 2709 → MARCXML   | 1.99 s  | 9.48 s     | 13.59 s      | 68 / 8.3 MB               |
-| ISO 2709 → text      | 0.55 s  | 2.90 s     | 3.41 s       | 47 / 8.2 MB               |
-| MARCXML → ISO 2709   | 3.37 s  | 9.61 s     | 25.11 s      | 23 / 10.7 MB              |
+| Conversion           | yaz-marcdump     | marcr -j 1               | marcr (all cores)        |
+|----------------------|------------------|--------------------------|--------------------------|
+| ISO 2709 → ISO 2709  | 4.88 s · 8.3 MB  | 2.83 s · ×1.7 · 42 MB    | 0.58 s · ×8.4 · 46 MB    |
+| ISO 2709 → MARCXML   | 13.59 s · 8.3 MB | 9.43 s · ×1.4 · 63 MB    | 1.94 s · ×7.0 · 70 MB    |
+| ISO 2709 → text      | 3.41 s · 8.2 MB  | 2.90 s · ×1.2 · 43 MB    | 0.55 s · ×6.2 · 52 MB    |
+| MARCXML → ISO 2709   | 25.11 s · 10.6 MB | 9.64 s · ×2.6 · 36 MB   | 3.40 s · ×7.4 · 23 MB    |
 
 The MARCXML input is the same extract converted to MARCXML (3.4 GB).
 Memory stays bounded whatever the input size: a few 4 MB batches of

@@ -8,6 +8,10 @@
 # Every conversion is run once to warm the file cache, then RUNS times
 # (default 3), its output discarded. Prints the median wall-clock time
 # and the peak memory of each tool.
+#
+# marcr processes records on all cores by default, yaz-marcdump on a
+# single one: marcr is measured both with -j 1 (single thread) and on all
+# cores. The speedup is yaz-marcdump's time divided by marcr's.
 set -euo pipefail
 
 input=${1:?Usage: bench/bench.sh FILE.mrc [RUNS]}
@@ -54,6 +58,11 @@ bench() {
     echo "$(median "${times[@]}") $(awk -v m="$peak" 'BEGIN {printf "%.1f", m / 1048576}')"
 }
 
+# yaz-marcdump time / marcr time, or "-" when a run is too short to be timed.
+speedup() {
+    awk -v y="$1" -v m="$2" 'BEGIN {if (m > 0) printf "x%.1f", y / m; else print "-"}'
+}
+
 in_iso=$(printf '%q' "$input")
 in_xml=$(printf '%q' "$xml")
 cases=(
@@ -63,13 +72,17 @@ cases=(
     "MARCXML -> ISO 2709|$marcr -d marcxml -s iso2709 $in_xml|yaz-marcdump -i marcxml -o marc $in_xml"
 )
 
-echo "Input: $input ($runs runs, median)"
-printf '%-22s %10s %10s %7s %12s %12s\n' "Conversion" "marcr" "yaz" "ratio" "marcr mem" "yaz mem"
+echo "Input: $input ($runs runs, median, $(getconf _NPROCESSORS_ONLN) cores)"
+echo "Speedup: yaz-marcdump time / marcr time"
+echo
+printf '%-22s | %-19s | %-27s | %-27s\n' "" "yaz-marcdump" "marcr -j 1" "marcr (all cores)"
+printf '%-22s | %8s %10s | %8s %7s %10s | %8s %7s %10s\n' \
+    "Conversion" "time" "memory" "time" "speedup" "memory" "time" "speedup" "memory"
 for c in "${cases[@]}"; do
     IFS='|' read -r name marcr_cmd yaz_cmd <<<"$c"
-    read -r mt mm < <(bench "$marcr_cmd")
     read -r yt ym < <(bench "$yaz_cmd")
-    # No ratio when a run is too short to be timed
-    ratio=$(awk -v m="$mt" -v y="$yt" 'BEGIN {if (m > 0) printf "x%.1f", y / m; else print "-"}')
-    printf '%-22s %9ss %9ss %7s %10s MB %9s MB\n' "$name" "$mt" "$yt" "$ratio" "$mm" "$ym"
+    read -r st sm < <(bench "$marcr -j 1 ${marcr_cmd#"$marcr "}")
+    read -r mt mm < <(bench "$marcr_cmd")
+    printf '%-22s | %7ss %7s MB | %7ss %7s %7s MB | %7ss %7s %7s MB\n' \
+        "$name" "$yt" "$ym" "$st" "$(speedup "$yt" "$st")" "$sm" "$mt" "$(speedup "$yt" "$mt")" "$mm"
 done
