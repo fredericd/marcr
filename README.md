@@ -266,6 +266,9 @@ On a 1 GB file (Apple M5, 10 cores), ISO 2709 → MARCXML takes 1.9 s
 instead of 9.5 s with one thread, ISO 2709 → ISO 2709 0.55 s instead of
 2.8 s.
 
+The diagrams in [docs/parallel.md](https://github.com/fredericd/marcr/blob/main/docs/parallel.md)
+show how it works: stages, queues, record order and error handling.
+
 ### Accessing fields
 
 `Record` directly exposes its fields (`leader`, `fields`) as well as
@@ -375,4 +378,5 @@ src/main.rs           Command-line interface (clap)
 src/parallel.rs       marcr::parallel, multi-core processing (feature "parallel")
 tests/cli.rs          Binary integration tests
 bench/bench.sh        Benchmark against yaz-marcdump
+docs/parallel.md      How marcr::parallel works (diagrams)
 ```
