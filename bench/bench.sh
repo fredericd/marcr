@@ -5,9 +5,10 @@
 #
 # FILE.mrc is a UTF-8 ISO 2709 file. A MARCXML copy (FILE.xml) is
 # generated next to it on the first run, for the MARCXML input case.
-# Every conversion is run once to warm the file cache, then RUNS times
-# (default 3), its output discarded. Prints the median wall-clock time
-# and the peak memory of each tool.
+# yaz-marcdump only reads a single-record JSON document, hence no JSON
+# input case. Every conversion is run once to warm the file cache, then
+# RUNS times (default 3), its output discarded. Prints the median
+# wall-clock time and the peak memory of each tool.
 #
 # marcr processes records on all cores by default, yaz-marcdump on a
 # single one: marcr is measured both with -j 1 (single thread) and on all
@@ -69,6 +70,7 @@ cases=(
     "ISO 2709 -> ISO 2709|$marcr -d iso2709 -s iso2709 $in_iso|yaz-marcdump -i marc -o marc $in_iso"
     "ISO 2709 -> MARCXML|$marcr -d iso2709 -s marcxml $in_iso|yaz-marcdump -i marc -o marcxml $in_iso"
     "ISO 2709 -> text|$marcr -d iso2709 -s text $in_iso|yaz-marcdump -i marc -o line $in_iso"
+    "ISO 2709 -> JSON|$marcr -d iso2709 -s json $in_iso|yaz-marcdump -i marc -o json $in_iso"
     "MARCXML -> ISO 2709|$marcr -d marcxml -s iso2709 $in_xml|yaz-marcdump -i marcxml -o marc $in_xml"
 )
 
