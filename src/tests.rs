@@ -536,6 +536,62 @@ fn writer_rejects_record_without_writing_anything() {
 }
 
 #[test]
+fn json_serialize() {
+    let record = Record::new(vec![
+        Field::Control(1, String::from("PPN1")),
+        Field::Standard(245, ['1', ' '], vec![Subfield('a', String::from("Titre \"cité\" {x}"))]),
+    ]);
+    let octets = Format::Json.serialize(&record).unwrap();
+    assert_eq!(
+        String::from_utf8(octets).unwrap(),
+        r#"{"leader":"00000nam a2200000   4500","fields":[{"001":"PPN1"},{"245":{"ind1":"1","ind2":" ","subfields":[{"a":"Titre \"cité\" {x}"}]}}]}"#,
+    );
+}
+
+#[test]
+fn json_roundtrip_through_writer_and_reader() {
+    // The Writer produces a JSON array; the Reader must find each record
+    // in it, braces and quotes inside values included.
+    let mut record = get_default_record();
+    record.add(Field::Standard(300, [' ', ' '], vec![Subfield('a', String::from(r#"a } b \" { c"#))]));
+    let mut writer = Writer::new(Format::Json, Vec::new());
+    writer.write(&record).unwrap();
+    writer.write(&record).unwrap();
+    writer.finish().unwrap();
+    let octets = std::mem::take(&mut writer.writer);
+    let array: Vec<serde_json::Value> = serde_json::from_slice(&octets).expect("valid JSON array");
+    assert_eq!(array.len(), 2);
+
+    let records: Vec<Record> = Reader::new(Format::Json, std::io::Cursor::new(octets))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records.len(), 2);
+    for parsed in records {
+        assert_eq!(parsed.to_string(), record.to_string());
+    }
+}
+
+#[test]
+fn json_reader_accepts_json_lines() {
+    let input = concat!(
+        r#"{"leader":"00000nam a2200000   4500","fields":[{"001":"1"}]}"#, "\n",
+        r#"{"leader":"00000nam a2200000   4500","fields":[{"200":{"subfields":[{"a":"x"}]}}]}"#, "\n",
+    );
+    let records: Vec<Record> = Reader::new(Format::Json, std::io::Cursor::new(input))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records[0].to_string(), "00000nam a2200000   4500\n001 1");
+    // Missing indicators are read as spaces
+    assert_eq!(records[1].to_string(), "00000nam a2200000   4500\n200    $a x");
+}
+
+#[test]
+fn json_writer_without_records_is_an_empty_array() {
+    let mut output = Vec::new();
+    drop(Writer::new(Format::Json, &mut output));
+    let array: Vec<serde_json::Value> = serde_json::from_slice(&output).unwrap();
+    assert!(array.is_empty());
+}
+
+#[test]
 fn marcxml_writer_without_records_is_valid_xml() {
     let mut output = Vec::new();
     drop(Writer::new(Format::Marcxml, &mut output));
@@ -678,6 +734,7 @@ fn malformed_errors_name_their_format() {
         (Format::Iso2709, &b"too short"[..], "malformed ISO 2709 record: "),
         (Format::Marcxml, &b"<record><controlfield tag=\"xyz\">1</controlfield></record>"[..], "malformed MARCXML record: "),
         (Format::Text, &b"short leader\n"[..], "malformed Text record: "),
+        (Format::Json, &br#"{"leader":"short","fields":[]}"#[..], "malformed MARC-in-JSON record: "),
     ];
     for (format, octets, prefix) in cases {
         let err = format.deserialize(octets).unwrap_err();
@@ -740,7 +797,7 @@ mod parallel_tests {
     #[test]
     fn convert_matches_sequential_output() {
         let (raw, total) = input_records();
-        for to in [Format::Iso2709, Format::Marcxml, Format::Text] {
+        for to in [Format::Iso2709, Format::Marcxml, Format::Text, Format::Json] {
             let (expected, expected_skipped) = sequential(&raw, to);
             let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw.clone()));
             let mut writer = Writer::new(to, Vec::new());

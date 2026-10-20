@@ -13,6 +13,7 @@ enum ArgFormat {
     Iso2709,
     Marcxml,
     Text,
+    Json,
 }
 
 // Quick Display implementation to unlock default_value_t
@@ -22,6 +23,7 @@ impl fmt::Display for ArgFormat {
             ArgFormat::Iso2709 => write!(f, "iso2709"),
             ArgFormat::Marcxml => write!(f, "marcxml"),
             ArgFormat::Text => write!(f, "text"),
+            ArgFormat::Json => write!(f, "json"),
         }
     }
 }
@@ -80,6 +82,7 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
             ArgFormat::Iso2709 => Format::Iso2709,
             ArgFormat::Marcxml => Format::Marcxml,
             ArgFormat::Text => Format::Text,
+            ArgFormat::Json => Format::Json,
         }
     };
 

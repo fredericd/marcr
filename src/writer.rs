@@ -10,7 +10,8 @@ const XML_HEADER: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collect
 /// For [`Format::Marcxml`], the XML prologue and the enclosing
 /// `<collection>` element are written automatically (opened on the first
 /// [`Writer::write`], closed by [`Writer::finish`]; an empty but valid
-/// collection is written if no record was); for [`Format::Text`] and
+/// collection is written if no record was); likewise for [`Format::Json`],
+/// with an enclosing JSON array. For [`Format::Text`] and
 /// [`Format::Marcxml`], successive records are separated by a blank line.
 ///
 /// Call [`Writer::finish`] once done, to close the output and get any
@@ -58,11 +59,15 @@ impl<W: Write> Writer<W> {
         if self.finished {
             return Err(std::io::Error::other("Writer already finished"));
         }
-        if self.format == Format::Marcxml && self.count == 0 {
-            self.writer.write_all(XML_HEADER)?;
+        if self.count == 0 {
+            self.writer.write_all(self.header())?;
         }
-        if self.count > 0 && (self.format == Format::Text || self.format == Format::Marcxml) {
-            self.writer.write_all("\n".as_bytes())?;
+        if self.count > 0 {
+            match self.format {
+                Format::Text | Format::Marcxml => self.writer.write_all(b"\n")?,
+                Format::Json => self.writer.write_all(b",\n")?,
+                Format::Iso2709 => (),
+            }
         }
         self.writer.write_all(octets)?;
         self.count += 1;
@@ -70,9 +75,9 @@ impl<W: Write> Writer<W> {
     }
 
     /// Closes the output: writes the closing `</collection>` for
-    /// [`Format::Marcxml`], then flushes the stream. Returns the first
-    /// write or flush error, which [`Drop`] would silently ignore. Calling
-    /// it again does nothing.
+    /// [`Format::Marcxml`] or `]` for [`Format::Json`], then flushes the
+    /// stream. Returns the first write or flush error, which [`Drop`]
+    /// would silently ignore. Calling it again does nothing.
     pub fn finish(&mut self) -> std::io::Result<()> {
         if self.finished {
             return Ok(());
@@ -85,13 +90,23 @@ impl<W: Write> Writer<W> {
 
     /// Writes what ends the output in the current format.
     fn close(&mut self) -> std::io::Result<()> {
-        if self.format == Format::Marcxml {
-            if self.count == 0 {
-                self.writer.write_all(XML_HEADER)?;
-            }
-            self.writer.write_all("\n</collection>\n".as_bytes())?;
+        if self.count == 0 {
+            self.writer.write_all(self.header())?;
         }
-        Ok(())
+        match self.format {
+            Format::Marcxml => self.writer.write_all(b"\n</collection>\n"),
+            Format::Json => self.writer.write_all(b"\n]\n"),
+            _ => Ok(()),
+        }
+    }
+
+    /// What starts the output in the current format, before the first record.
+    fn header(&self) -> &'static [u8] {
+        match self.format {
+            Format::Marcxml => XML_HEADER,
+            Format::Json => b"[\n",
+            _ => b"",
+        }
     }
 }
 

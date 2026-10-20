@@ -84,6 +84,12 @@ impl<R: Read + BufRead> Reader<R> {
         self.read_as(Format::Text)
     }
 
+    /// Reads the next MARC-in-JSON record, whatever `self.format`: the
+    /// next top-level JSON object, in an array or not.
+    pub fn read_json(&mut self) -> Result<Option<Record>, Error> {
+        self.read_as(Format::Json)
+    }
+
     /// Extracts and parses the next record in `format`.
     fn read_as(&mut self, format: Format) -> Result<Option<Record>, Error> {
         match self.extract(format, |octets| format.deserialize(octets))? {
@@ -106,6 +112,7 @@ impl<R: Read + BufRead> Reader<R> {
             Format::Iso2709 => self.extract_iso2709(&mut f)?,
             Format::Marcxml => self.extract_marcxml(&mut f)?,
             Format::Text    => self.extract_text(&mut f)?,
+            Format::Json    => self.extract_json(&mut f)?,
         };
         Ok(value.map(|value| {
             self.count += 1;
@@ -267,6 +274,68 @@ impl<R: Read + BufRead> Reader<R> {
                     break;
                 }
                 self.buffer.push(b);
+            }
+            self.reader.consume(consumed);
+            self.position += consumed as u64;
+        }
+        Ok(option_result)
+    }
+    /// MARC-in-JSON extraction: captures the next top-level `{...}`
+    /// object, counting braces outside JSON strings. Bytes between
+    /// objects (`[`, `,`, `]`, whitespace) are skipped, so that a JSON
+    /// array of records and concatenated objects (JSON Lines) are both
+    /// accepted. An object unterminated at end of stream is passed to `f`
+    /// as is, to be reported as malformed.
+    fn extract_json<T>(&mut self, f: &mut impl FnMut(&[u8]) -> T) -> std::io::Result<Option<T>> {
+        self.buffer.clear();
+        let mut found = false;
+        // Kept until the record bytes are consumed (see read_iso2709).
+        let mut option_result = None;
+        let mut depth = 0usize;
+        let mut in_string = false;
+        let mut escaped = false;
+
+        while !found {
+            let available = self.reader.fill_buf()?;
+            if available.is_empty() {
+                if !self.buffer.is_empty() {
+                    option_result = Some(f(&self.buffer));
+                }
+                break;
+            }
+
+            let mut consumed = 0;
+            for &b in available {
+                consumed += 1;
+                if depth == 0 {
+                    if b != b'{' {
+                        continue; // Between objects
+                    }
+                } else if in_string {
+                    if escaped {
+                        escaped = false;
+                    } else if b == b'\\' {
+                        escaped = true;
+                    } else if b == b'"' {
+                        in_string = false;
+                    }
+                    self.buffer.push(b);
+                    continue;
+                }
+                self.buffer.push(b);
+                match b {
+                    b'"' => in_string = true,
+                    b'{' => depth += 1,
+                    b'}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            found = true;
+                            option_result = Some(f(&self.buffer));
+                            break;
+                        }
+                    },
+                    _ => (),
+                }
             }
             self.reader.consume(consumed);
             self.position += consumed as u64;

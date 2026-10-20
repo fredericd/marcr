@@ -3,6 +3,7 @@ use std::fmt;
 use crate::{Error, Record};
 
 mod iso2709;
+mod json;
 mod marcxml;
 mod text;
 
@@ -20,16 +21,22 @@ pub enum Format {
   /// Reading and writing supported; [`crate::Reader`] splits records on a
   /// blank line (the separator produced by [`crate::Writer`] for this format).
   Text,
+  /// MARC-in-JSON, one JSON object per record (`.json` extension).
+  /// Reading and writing supported; [`crate::Writer`] produces a JSON
+  /// array of records, [`crate::Reader`] accepts an array as well as
+  /// concatenated objects (JSON Lines, for instance).
+  Json,
 }
 
-/// The format name, as used in error messages: `ISO 2709`, `MARCXML`
-/// or `Text`.
+/// The format name, as used in error messages: `ISO 2709`, `MARCXML`,
+/// `Text` or `MARC-in-JSON`.
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Format::Iso2709 => "ISO 2709",
             Format::Marcxml => "MARCXML",
             Format::Text => "Text",
+            Format::Json => "MARC-in-JSON",
         })
     }
 }
@@ -63,6 +70,11 @@ impl Format {
                 description: String::from("Text"),
                 extension: String::from("txt"),
             },
+            RWDescription{
+                format: Format::Json,
+                description: String::from("MARC-in-JSON"),
+                extension: String::from("json"),
+            },
         ]
     }
 
@@ -76,6 +88,7 @@ impl Format {
             Format::Iso2709 => self.deserialize_iso2709(octets),
             Format::Marcxml => self.deserialize_marcxml(octets),
             Format::Text => self.deserialize_text(octets),
+            Format::Json => self.deserialize_json(octets),
         }
     }
 
@@ -89,6 +102,7 @@ impl Format {
             Format::Iso2709 => self.serialize_iso2709(record),
             Format::Marcxml => Ok(self.serialize_marcxml(record)),
             Format::Text => Ok(self.serialize_text(record)),
+            Format::Json => Ok(self.serialize_json(record)),
         }
     }
 }

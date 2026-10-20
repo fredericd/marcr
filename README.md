@@ -1,13 +1,16 @@
 # marcr
 
 Rust library and command-line tool to read and write MARC bibliographic
-records, converting between three formats:
+records, converting between four formats:
 
 - **ISO 2709** (`iso2709`) — the classic binary MARC exchange format.
 - **MARCXML** (`marcxml`) — the standardized XML representation (Library
   of Congress).
 - **Text** (`text`) — a human-readable representation, one line per
   field.
+- **MARC-in-JSON** (`json`) — the JSON representation of MARC records;
+  written as a JSON array, read from an array or from concatenated
+  objects (JSON Lines).
 
 ## Character encoding
 
@@ -20,7 +23,7 @@ Non-UTF-8 input is handled differently depending on the format:
 
 - **ISO 2709**: invalid bytes are replaced by the replacement character
   `�` (U+FFFD), **without any warning**; the record is otherwise read.
-- **MARCXML** and **text**: the record is rejected as malformed (reported
+- **MARCXML**, **text** and **MARC-in-JSON**: the record is rejected as malformed (reported
   and skipped by the command-line tool).
 
 The leader's character coding position (09) is neither checked on input
@@ -45,9 +48,9 @@ marcr [OPTIONS] [FILES]...
 
 Options:
   -d, --deserialize <FORMAT>  Format of the input files [default: iso2709]
-                              [possible values: iso2709, marcxml, text]
+                              [possible values: iso2709, marcxml, text, json]
   -s, --serialize <FORMAT>    Format of the output file [default: text]
-                              [possible values: iso2709, marcxml, text]
+                              [possible values: iso2709, marcxml, text, json]
   -o, --output <NAME>         Name of the output file (stdout otherwise)
   -j, --jobs <N>              Number of threads used to process records
                               [default: one per core]
@@ -370,6 +373,7 @@ src/format/mod.rs     Format enum, RWDescription, serialize/deserialize dispatch
 src/format/iso2709.rs ISO 2709 (de)serialization
 src/format/marcxml.rs MARCXML (de)serialization
 src/format/text.rs    Text format (de)serialization
+src/format/json.rs    MARC-in-JSON (de)serialization
 src/error.rs          marcr::Error
 src/reader.rs         Reader
 src/writer.rs         Writer
