@@ -732,6 +732,33 @@ fn marcxml_writer_without_records_is_valid_xml() {
 }
 
 #[test]
+fn marcxml_serialize_exact_output() {
+    // Serialized by hand: locks the output previously produced by
+    // quick-xml's indenting writer (escapes, empty field and subfield).
+    let record = Record::new(vec![
+        Field::Control(1, String::from(r#"a&b<c>d"e'f"#)),
+        Field::Standard(245, ['"', '&'], vec![
+            Subfield('a', String::from("<Tom & Jerry>")),
+            Subfield('b', String::new()),
+            Subfield('<', String::from("x")),
+        ]),
+        Field::Standard(500, ['1', '2'], vec![]),
+    ]);
+    let octets = Format::Marcxml.serialize(&record).unwrap();
+    assert_eq!(String::from_utf8(octets).unwrap(), r#"<record>
+  <leader>00000nam a2200000   4500</leader>
+  <controlfield tag="001">a&amp;b&lt;c&gt;d&quot;e&apos;f</controlfield>
+  <datafield tag="245" ind1="&quot;" ind2="&amp;">
+    <subfield code="a">&lt;Tom &amp; Jerry&gt;</subfield>
+    <subfield code="b"></subfield>
+    <subfield code="&lt;">x</subfield>
+  </datafield>
+  <datafield tag="500" ind1="1" ind2="2">
+  </datafield>
+</record>"#);
+}
+
+#[test]
 fn marcxml_roundtrip_preserves_special_characters() {
     // Characters escaped as entities in XML must come back unchanged.
     let value = r#"Fish & chips <"quoted"> l'été"#;

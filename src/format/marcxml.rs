@@ -1,9 +1,8 @@
 use std::str;
 
 use quick_xml::escape::unescape;
-use quick_xml::events::{BytesText, Event};
+use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
-use quick_xml::writer::Writer as XmlWriter;
 use quick_xml::XmlVersion;
 
 use crate::{Error, Field, Record, Subfield};
@@ -14,53 +13,53 @@ impl Format {
     /// Serializes `record` to a MARCXML `<record>` element (indented),
     /// with no XML prologue nor enclosing `<collection>` element — see
     /// [`crate::Writer`] to produce a complete MARCXML document.
+    ///
+    /// Written directly into a byte buffer: the XML structure is fixed, and
+    /// an XML writer allocated for each attribute.
     pub fn serialize_marcxml(&self, record: &Record) -> Vec<u8> {
-        let cursor = std::io::Cursor::new(Vec::new());
-        let mut xml_writer = XmlWriter::new_with_indent(cursor, b' ', 2);
-        match xml_writer
-            .create_element("record")
-            .write_inner_content(|writer| {
-                let leader_str = String::from_utf8_lossy(&record.leader);
-                writer
-                    .create_element("leader")
-                    .write_text_content(BytesText::new(&leader_str))?;
-                for field in record.fields.iter() {
-                    match field {
-                        Field::Control(tag, value) => {
-                            let tag_str = format!("{tag:03}");
-                            writer
-                                .create_element("controlfield")
-                                .with_attribute(("tag", tag_str.as_str()))
-                                .write_text_content(BytesText::new(value))?;
-                        },
-                        Field::Standard(tag, ind, subfields) => {
-                            let tag_str = format!("{tag:03}");
-                            writer
-                                .create_element("datafield")
-                                .with_attribute(("tag", tag_str.as_str()))
-                                .with_attribute(("ind1", ind[0].to_string().as_str()))
-                                .with_attribute(("ind2", ind[1].to_string().as_str()))
-                                .write_inner_content(|w| {
-                                    for Subfield(letter, value) in subfields {
-                                        let letter_str = format!("{letter}");
-                                        w
-                                            .create_element("subfield")
-                                            .with_attribute(("code", letter_str.as_str()))
-                                            .write_text_content(BytesText::new(value))?;
-                                    }
-                                    Ok(())
-                                })?;
-                        },
-                    }
+        let mut size = 64;
+        for field in record.fields.iter() {
+            size += match field {
+                Field::Control(_, value) => 48 + value.len(),
+                Field::Standard(_, _, subfields) => {
+                    72 + subfields.iter().map(|Subfield(_, value)| 40 + value.len()).sum::<usize>()
                 }
-                Ok(())
-            }) {
-                Ok(_) => 1,
-                Err(_) => 1, // No error possible!
             };
-        let cursor = xml_writer.into_inner();
-        let octets: Vec<u8> = cursor.into_inner();
-        octets
+        }
+        let mut buffer: Vec<u8> = Vec::with_capacity(size);
+        buffer.extend_from_slice(b"<record>\n  <leader>");
+        push_escaped(&mut buffer, &String::from_utf8_lossy(&record.leader));
+        buffer.extend_from_slice(b"</leader>");
+        for field in record.fields.iter() {
+            match field {
+                Field::Control(tag, value) => {
+                    buffer.extend_from_slice(b"\n  <controlfield tag=\"");
+                    push_tag(&mut buffer, *tag);
+                    buffer.extend_from_slice(b"\">");
+                    push_escaped(&mut buffer, value);
+                    buffer.extend_from_slice(b"</controlfield>");
+                },
+                Field::Standard(tag, ind, subfields) => {
+                    buffer.extend_from_slice(b"\n  <datafield tag=\"");
+                    push_tag(&mut buffer, *tag);
+                    buffer.extend_from_slice(b"\" ind1=\"");
+                    push_escaped(&mut buffer, ind[0].encode_utf8(&mut [0; 4]));
+                    buffer.extend_from_slice(b"\" ind2=\"");
+                    push_escaped(&mut buffer, ind[1].encode_utf8(&mut [0; 4]));
+                    buffer.extend_from_slice(b"\">");
+                    for Subfield(code, value) in subfields {
+                        buffer.extend_from_slice(b"\n    <subfield code=\"");
+                        push_escaped(&mut buffer, code.encode_utf8(&mut [0; 4]));
+                        buffer.extend_from_slice(b"\">");
+                        push_escaped(&mut buffer, value);
+                        buffer.extend_from_slice(b"</subfield>");
+                    }
+                    buffer.extend_from_slice(b"\n  </datafield>");
+                },
+            }
+        }
+        buffer.extend_from_slice(b"\n</record>");
+        buffer
     }
 
     /// Parses a MARCXML `<record>` element (attributes, namespace and
@@ -69,6 +68,36 @@ impl Format {
     /// be valid UTF-8.
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Error> {
         parse_marcxml(octets).map_err(|e| Error::malformed(Format::Marcxml, e.to_string()))
+    }
+}
+
+/// Appends `value` to `buffer`, escaping the five XML special characters
+/// (in text and attribute values alike).
+fn push_escaped(buffer: &mut Vec<u8>, value: &str) {
+    let bytes = value.as_bytes();
+    let mut start = 0;
+    for (i, &b) in bytes.iter().enumerate() {
+        let entity: &[u8] = match b {
+            b'&' => b"&amp;",
+            b'<' => b"&lt;",
+            b'>' => b"&gt;",
+            b'"' => b"&quot;",
+            b'\'' => b"&apos;",
+            _ => continue,
+        };
+        buffer.extend_from_slice(&bytes[start..i]);
+        buffer.extend_from_slice(entity);
+        start = i + 1;
+    }
+    buffer.extend_from_slice(&bytes[start..]);
+}
+
+/// Appends `tag` on at least three digits (`001`), as `{tag:03}` would.
+fn push_tag(buffer: &mut Vec<u8>, tag: u16) {
+    if tag < 1000 {
+        buffer.extend_from_slice(&[b'0' + (tag / 100) as u8, b'0' + (tag / 10 % 10) as u8, b'0' + (tag % 10) as u8]);
+    } else {
+        buffer.extend_from_slice(tag.to_string().as_bytes());
     }
 }
 
