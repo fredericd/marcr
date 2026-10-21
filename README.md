@@ -356,11 +356,11 @@ marcr's) and the peak memory:
 
 | Conversion           | yaz-marcdump     | marcr -j 1               | marcr (all cores)        |
 |----------------------|------------------|--------------------------|--------------------------|
-| ISO 2709 → ISO 2709  | 4.93 s · 8.4 MB  | 2.83 s · ×1.7 · 46 MB    | 0.56 s · ×8.8 · 50 MB    |
-| ISO 2709 → MARCXML   | 13.91 s · 8.3 MB | 9.46 s · ×1.5 · 63 MB    | 2.02 s · ×6.9 · 71 MB    |
-| ISO 2709 → text      | 3.57 s · 8.2 MB  | 2.93 s · ×1.2 · 47 MB    | 0.55 s · ×6.5 · 46 MB    |
-| ISO 2709 → JSON      | 6.82 s · 8.4 MB  | 3.24 s · ×2.1 · 55 MB    | 0.66 s · ×10.3 · 58 MB   |
-| MARCXML → ISO 2709   | 25.55 s · 9.2 MB | 9.61 s · ×2.7 · 36 MB    | 2.00 s · ×12.8 · 39 MB   |
+| ISO 2709 → ISO 2709  | 4.98 s · 8.4 MB  | 1.93 s · ×2.6 · 42 MB    | 0.38 s · ×13.1 · 50 MB   |
+| ISO 2709 → MARCXML   | 13.87 s · 8.4 MB | 2.51 s · ×5.5 · 66 MB    | 0.60 s · ×23.1 · 322 MB  |
+| ISO 2709 → text      | 3.52 s · 8.3 MB  | 2.75 s · ×1.3 · 43 MB    | 0.52 s · ×6.8 · 51 MB    |
+| ISO 2709 → JSON      | 6.84 s · 8.4 MB  | 3.13 s · ×2.2 · 51 MB    | 0.62 s · ×11.0 · 81 MB   |
+| MARCXML → ISO 2709   | 25.44 s · 10.7 MB | 8.82 s · ×2.9 · 36 MB   | 1.88 s · ×13.5 · 39 MB   |
 
 `yaz-marcdump` writes indented JSON, `marcr` one record per line. There
 is no JSON input case: `yaz-marcdump` only reads a single-record JSON
@@ -368,7 +368,9 @@ document.
 
 The MARCXML input is the same extract converted to MARCXML (3.4 GB).
 Memory stays bounded whatever the input size: a few 4 MB batches of
-records are in flight between threads.
+input records are in flight between threads, along with their
+serialized output. MARCXML output being about 3.5 times larger than ISO
+2709, writing it on all cores needs a few hundred MB.
 
 ## Tests
 
