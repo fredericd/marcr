@@ -532,6 +532,37 @@ fn marcxml_malformed_records_return_errors() {
 }
 
 #[test]
+fn iso2709_reader_replaces_invalid_utf8() {
+    // "café" with its first byte made invalid: U+FFFD for each bad byte.
+    let record = Record::new(vec![Field::Standard(200, [' ', ' '], vec![Subfield('a', String::from("café"))])]);
+    let mut octets = Format::Iso2709.serialize(&record).unwrap();
+    let pos = octets.windows(2).position(|w| w == "é".as_bytes()).unwrap();
+    octets[pos] = 0xff;
+    let parsed = Format::Iso2709.deserialize(&octets).unwrap();
+    assert_eq!(parsed.field(200).unwrap().subfield('a'), Some("caf\u{FFFD}\u{FFFD}"));
+}
+
+#[test]
+fn iso2709_reader_non_ascii_subfield_code_does_not_panic() {
+    // DE C3 A9 'x': valid UTF-8 as a whole ("é"), but the subfield code
+    // byte splits the character, so the value starts mid-character.
+    let record = Record::new(vec![Field::Standard(200, [' ', ' '], vec![Subfield('Z', String::from("Ax"))])]);
+    let mut octets = Format::Iso2709.serialize(&record).unwrap();
+    let pos = octets.windows(2).position(|w| w == b"ZA").unwrap();
+    octets[pos] = 0xc3;
+    octets[pos + 1] = 0xa9;
+    let parsed = Format::Iso2709.deserialize(&octets).unwrap();
+    assert_eq!(parsed.field(200).unwrap().subfield('\u{c3}'), Some("\u{FFFD}x"));
+}
+
+#[test]
+fn iso2709_serialize_rejects_tag_over_999() {
+    let record = Record::new(vec![Field::Control(1000, String::from("x"))]);
+    let err = Format::Iso2709.serialize(&record).unwrap_err();
+    assert!(err.to_string().contains("invalid tag 1000"), "{err}");
+}
+
+#[test]
 fn iso2709_serialize_rejects_oversized_records() {
     // A field longer than 9999 bytes cannot be described in the directory.
     let long_field = Record::new(vec![
