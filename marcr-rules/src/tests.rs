@@ -132,6 +132,27 @@ fn default_rule_and_like() {
 }
 
 #[test]
+fn source_field_ranks() {
+    let rules = rules(
+        r#"
+        500[1] when 700 -> 240 [10] { $a -> $a }
+        500[1] when !700 -> 130 [0#] like 500
+        500[2..] -> 730 [0#] { $a -> $a ; $r -> += ",", $m ; $s -> += ".", $n ; order $a $m $n }
+        "#,
+    );
+    let source = record(vec![
+        vec!["500", "  ", "a", "Sonates", "s", "K 1", "r", "Clavier"],
+        vec!["500", "  ", "a", "Stabat Mater"],
+        vec!["500", "  ", "a", "Sonates", "s", "K 90", "r", "Clavier"],
+    ]);
+    assert_eq!(lines(&rules.apply(&source)), [
+        "130 0# $aSonates",
+        "730 0# $aStabat Mater",
+        "730 0# $aSonates. $mClavier $nK 90,",
+    ]);
+}
+
+#[test]
 fn punctuation_and_order() {
     let rules = rules(
         r#"

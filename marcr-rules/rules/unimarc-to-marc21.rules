@@ -258,6 +258,40 @@ table visual {
   c = v
 }
 
+# 4XX tag -> 780/785 indicator 2 (relationship)
+table ind780 {
+  430 = 0
+  431 = 1
+  432 = 2
+  433 = 3
+  434 = 5
+  435 = 6
+  436 = 4
+  437 = 7
+  440 = 0
+  441 = 1
+  442 = 2
+  443 = 3
+  444 = 4
+  445 = 5
+  446 = 6
+  447 = 7
+  448 = 8
+}
+
+# 327 indicator 1 -> 505 indicator 1 (complete, incomplete, partial)
+table ind505 {
+  0 = 1
+  1 = 0
+  2 = 2
+  * = 8
+}
+
+# Bibliographic level of the record (LDR/7) -> 773 $7 of the host
+table level {
+  m = "   s"
+}
+
 # ---- Leader and control fields --------------------------------------
 
 record -> LDR "{LDR/0-4}{LDR/5}{LDR/6|table(type)}{LDR/7} a2200000 i 4500"
@@ -351,7 +385,7 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 # General notes
 300 301 302 304 305 306 307 308 312 333 -> 500 [##] { $a -> $a ; end "." }
 320 -> 504 [##] { $a -> $a ; end "." }
-327 -> 505 [0#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
+327 -> 505 [{@ind1|table(ind505)}#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
 328 -> 502 [##] { $b -> $a ; $c -> += " : {}" ; $e -> += " : {}" ; $d -> += " : {}" }
 330 -> 520 [##] { $a -> $a ; $2 -> $c ; end "." }
 314 -> 550 [##] { $a -> $a }
@@ -359,6 +393,7 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 326 -> 310 [##] { $a -> $a }
 337 -> 538 [##] { $a -> $a ; end "." }
 371 -> 506 [##] { $8 -> $3 ; $a -> $a ; $c -> $e }
+359 -> 559 { $* -> $* }
 
 # ---- Linking entries ------------------------------------------------
 
@@ -396,9 +431,66 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $p -> $h
   $s -> += ". (@{})"
   $y -> $z
+  $x -> $x
   $0 -> $w "(ABES){}"
-  order $t $b $d $h $z $w
+  order $t $b $d $h $x $z $w
 }
+# Host item; $7 tells the host is a serial when this record is a monograph.
+# A part (463) with a record of its own is a host too.
+461 -> 773 [0#] {
+  $t -> $t | strip_nsb
+  $h -> += ". {}"
+  $i -> += ",  {}"
+  $l -> += " {}"
+  $o -> += " : {}"
+  $f -> += " / {}"
+  $e -> $b
+  $c -> $d
+  $n -> += " : {}"
+  $d -> += ", {}"
+  $p -> $h
+  $s -> += ". (@{})"
+  $v -> $g
+  $y -> $z
+  $0 -> $w "(ABES){}", $7 {LDR/7|table(level)}
+  order $t $b $d $h $g $z $w $7
+}
+# A responsibility left in $t is dropped
+464 -> 774 [0#] {
+  $t -> $t | strip_nsb | replace(' / .*$', '')
+  $h -> += ". {}"
+  $i -> += ",  {}"
+  $l -> += " @{}"
+  $e -> += " : {}"
+  $f -> += " / {}"
+  $d -> $d
+  $p -> $h
+  $v -> $g
+  order $t $d $h $g
+}
+463 when !$0 -> 774 [0#] like 464
+463 when $0 -> 773 [0#] like 461
+451 455 -> 775 [0#] like 452
+454 -> 765 [0#] {
+  $t -> $t | strip_nsb
+  $h -> += ". {}"
+  $i -> += ",  {}"
+  $o -> += " : {}"
+  $f -> += " / {}"
+  $d -> $d
+  $0 -> $w "(ABES){}"
+  order $t $d $w
+}
+423 -> 777 [0#] like 452
+422 -> 772 [0#] like 452
+412 488 -> 787 [0#] like 452
+430 431 432 433 434 435 436 437 -> 780 [1{@tag|table(ind780)}] {
+  $t -> $t | strip_nsb
+  $x -> $x
+  $0 -> $w "(ABES){}"
+  order $t $x $w
+}
+440 441 442 443 444 445 446 447 448 -> 785 [1{@tag|table(ind780)}] like 430
 410 -> 830 [#{$t|nonfiling}] {
   $t -> $a | strip_nsb
   $d -> $f before "."
@@ -407,6 +499,37 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 
 # ---- Titles ---------------------------------------------------------
 
+# Uniform titles: the first one goes to 240 (with a main entry) or 130,
+# the others to 730. Punctuation goes after the previous subfield, in the
+# source order, before the subfields are sorted.
+500[1] when 700,710,720 -> 240 [1{$a|nonfiling}] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a | strip_nsb
+  $l -> += ".", $k
+  $m -> += ".", $l
+  $k -> += ".", $f
+  $n -> += ".", $g
+  $r -> += ",", $m
+  $s -> += ".", $n
+  $u -> += ",", $r
+  $w -> += ";", $o
+  order $0 $1 $a $k $l $f $m $o $r $n $g
+}
+500[1] when !700,710,720 -> 130 [{$a|nonfiling}#] like 500
+500[2..] -> 730 [{$a|nonfiling}#] like 500
+# Form headings: the date (and day) of a sale goes to $d
+503 when !$d -> 730 [0#] {
+  $a -> $a ; $b -> += ". {}"
+  $e -> $g ; $f -> += ", {}" ; $h -> += ", {}"
+  $m -> $g ; $n -> += ". {}"
+  $j -> += ". {}"
+}
+503 when $d -> 730 [0#] {
+  $a -> $a ; $b -> += ". {}"
+  $m -> $g ; $n -> += ". {}"
+  $d[1] -> $d "{$j}-{|replace('^(..)(..)$', '$1-$2')}"
+  order $a $d $g
+}
 517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b }
 530 -> 222 [#0] { $a -> $a | strip_nsb ; $b -> $b }
 541 -> 242 [1{$a|nonfiling}] {
@@ -468,13 +591,41 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $2 -> $2 "ram"
   end "." skip $2
 }
+# Meetings (indicator 1 = 1) go to 611, without number, date and place
+601 when $2=rameau when !@ind1=1 -> 610 [{@ind2}7] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a
+  $b -> $b before "."
+  $c -> += " ({})"
+  $d -> $d ; $e -> $e ; $f -> $f
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $0 $1 $2
+}
+601 when $2=lc when !@ind1=1 -> 610 [{@ind2}0] {
+  $a -> $a
+  $b -> $b before "."
+  $c -> += " ({})"
+  $d -> $d ; $e -> $e ; $f -> $f
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2
+  end "." skip $2
+}
+601 when $2=rameau when @ind1=1 -> 611 [{@ind2}7] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $0 $1 $2
+}
 610 -> 653 [##] { $a -> $a | replace(',$', '') }
 
 # ---- Classifications ------------------------------------------------
 
 676 -> 082 [0#] { $a -> $a ; $v -> $2 }
 680 -> 050 [#4] { $a -> $a ; $b -> $b }
-686 -> 084 [##] { $a -> $a ; $2 -> $2 ; end "." skip $2 }
+686 when $2=usnlm -> 060 [#4] { $a -> $a }
+686 when !$2=usnlm -> 084 [##] { $a -> $a ; $2 -> $2 ; end "." skip $2 }
 
 # ---- Names ----------------------------------------------------------
 

@@ -31,6 +31,9 @@ pub(crate) enum Source {
 #[derive(Clone, Debug)]
 pub(crate) struct Rule {
     pub source: Source,
+    /// `500[2..]`: occurrence range of the source field among the fields
+    /// with its tag.
+    pub rank: Range,
     pub conds: Vec<Cond>,
     pub target: Target,
 }
@@ -71,21 +74,24 @@ pub(crate) struct Line {
 pub(crate) struct Lhs {
     /// `None` for `$*`.
     pub code: Option<char>,
-    /// 1-based occurrence range, negative counting from the end; `None`
-    /// for an open end.
-    pub range: (i64, Option<i64>),
+    pub range: Range,
+}
+
+/// 1-based occurrence range, negative counting from the end; `None` for
+/// an open end. `(1, None)` selects every occurrence.
+pub(crate) type Range = (i64, Option<i64>);
+
+/// Whether occurrence `k` (1-based) of `n` is in `range`.
+pub(crate) fn in_range((start, end): Range, k: usize, n: usize) -> bool {
+    let resolve = |i: i64| if i < 0 { n as i64 + 1 + i } else { i };
+    let k = k as i64;
+    k >= resolve(start) && end.is_none_or(|end| k <= resolve(end))
 }
 
 impl Lhs {
     /// Whether occurrence `k` (1-based) of `n` of `code` is selected.
     pub(crate) fn matches(&self, code: char, k: usize, n: usize) -> bool {
-        if self.code.is_some_and(|c| c != code) {
-            return false;
-        }
-        let resolve = |i: i64| if i < 0 { n as i64 + 1 + i } else { i };
-        let (start, end) = self.range;
-        let k = k as i64;
-        k >= resolve(start) && end.is_none_or(|end| k <= resolve(end))
+        self.code.is_none_or(|c| c == code) && in_range(self.range, k, n)
     }
 }
 
@@ -473,6 +479,7 @@ impl<'a> Parser<'a> {
                 None => return self.error(format!("expected a rule, `rules`, `version` or `table`, found `{word}`")),
             },
         };
+        let rank = if matches!(source, Source::Tags(_)) { self.range()? } else { (1, None) };
         let mut conds = Vec::new();
         loop {
             self.skip_ws();
@@ -515,7 +522,7 @@ impl<'a> Parser<'a> {
                 Target::Data { tag, inds, body }
             }
         };
-        Ok(Rule { source, conds, target })
+        Ok(Rule { source, rank, conds, target })
     }
 
     /// The two indicators, after `[`: a character each (`#` for a blank)
@@ -618,17 +625,22 @@ impl<'a> Parser<'a> {
     /// After `$`: `c`, `c[2]`, `c[2..]`, `c[1..3]`, `c[-1]`, `*`.
     fn lhs(&mut self) -> Result<Lhs> {
         let code = self.code()?;
-        let mut range = (1, None);
-        if self.eat("[") {
-            let start = self.number()?;
-            range = if self.eat("..") {
-                (start, if self.peek() == Some(']') { None } else { Some(self.number()?) })
-            } else {
-                (start, Some(start))
-            };
-            self.expect("]")?;
+        Ok(Lhs { code, range: self.range()? })
+    }
+
+    /// An optional `[2]`, `[2..]`, `[1..3]`, `[-1]`.
+    fn range(&mut self) -> Result<Range> {
+        if !self.eat("[") {
+            return Ok((1, None));
         }
-        Ok(Lhs { code, range })
+        let start = self.number()?;
+        let range = if self.eat("..") {
+            (start, if self.peek() == Some(']') { None } else { Some(self.number()?) })
+        } else {
+            (start, Some(start))
+        };
+        self.expect("]")?;
+        Ok(range)
     }
 
     /// A subfield code, `None` for `*`.

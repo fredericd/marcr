@@ -2,7 +2,7 @@
 
 use marcr::{Field, Record, Subfield};
 
-use crate::syntax::{Before, Body, Cond, Expr, Func, Idx, Ind, Operand, Output, Parsed, Piece, Source, Table, Target, Test, Value};
+use crate::syntax::{in_range, Before, Body, Cond, Expr, Func, Idx, Ind, Operand, Output, Parsed, Piece, Source, Table, Target, Test, Value};
 
 /// What templates and conditions can refer to.
 #[derive(Clone, Copy)]
@@ -45,11 +45,14 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
             produce(&rule.target, base, &mut target);
         }
     }
-    for field in &record.fields {
+    for (i, field) in record.fields.iter().enumerate() {
         let ctx = Ctx { field: Some(field), ..base };
+        let same_tag = |fields: &[Field]| fields.iter().filter(|f| f.tag() == field.tag()).count();
         let mut converted = false;
         for rule in &parsed.rules {
             if matches!(&rule.source, Source::Tags(pats) if pats.iter().any(|pat| pat.matches(*field.tag())))
+                && (rule.rank == (1, None)
+                    || in_range(rule.rank, same_tag(&record.fields[..=i]), same_tag(&record.fields)))
                 && rule.conds.iter().all(|cond| test(cond, ctx))
             {
                 produce(&rule.target, ctx, &mut target);

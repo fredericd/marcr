@@ -76,7 +76,8 @@ SOURCE [when CONDITION]... -> TARGET
 
 The source is one or more tag patterns (`606`, `7..`, `300 301 302`),
 `record` (applied once per record) or `*` (fields that no other rule
-converted). Every rule whose
+converted). A rank selects source fields by their occurrence among the
+fields with the same tag: `500[1] -> 240`, `500[2..] -> 730`. Every rule whose
 source and conditions match a field applies: a field can produce several
 fields (`410 -> 760` and `410 -> 830`). The fields of the converted
 record are sorted by tag; fields that no rule converts are dropped.
@@ -124,7 +125,9 @@ Outputs, separated by commas:
   copied. A subfield whose value is empty is not produced, unless the
   value is a literal (`-> $b ""`); a field without subfields is not
   produced.
-- `+= VALUE`: appended to the last subfield produced.
+- `+= VALUE`: appended to the last subfield produced, in the source
+  order: `$r -> += ",", $m` puts a comma after the subfield preceding
+  `$r`, even if `order` moves it.
 - `before "P"`, after a `$c` output: when the subfield is not the first
   of the field, `P` is appended to the subfield preceding it.
   `before "P" after $b` only applies if that subfield is a `$b`; several
