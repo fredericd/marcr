@@ -1,0 +1,236 @@
+# UNIMARC to MARC21, written after the conversion of the Sudoc (Abes) and
+# evaluated on pairs of Sudoc records (see corpus/ in the marcr-rules
+# repository).
+
+rules "UNIMARC to MARC21 (Sudoc)"
+version 0.1
+
+# ---- Tables ---------------------------------------------------------
+
+# UNIMARC relator code -> MARC21 relator code, label
+table roles {
+  003 = dgs., Encadrant académique
+  005 = act., Acteur
+  010 = adp., Adaptation
+  030 = arr., Arrangement / Réduction
+  040 = art., Artiste
+  065 = auc., Commissaire-priseur
+  070 = aut., Auteur
+  072 = aqt., Auteur cité
+  075 = aft., Postface
+  080 = aui., Préface
+  100 = ant., Auteur adapté /précédent
+  130 = bkd., Maquette
+  180 = ctg., Cartographie
+  195 = cnd., Chef de choeur
+  200 = chr., Chorégraphie
+  205 = col., Collaborateur
+  212 = ann., Notes
+  230 = mus., Musique
+  245 = ccp., Idée originale
+  250 = cnd., Chef d'orchestre
+  255 = csp., Consultant
+  273 = cur., Commissaire
+  280 = dte., Dédicataire
+  295 = dgg., Organisme de soutenance
+  300 = rsg., Réalisateur / Metteur en scène / Directeur artistique
+  330 = dub., Auteur prétendu
+  340 = edt., Éditeur scientifique
+  350 = egr., Gravure
+  365 = exp., Expert
+  390 = fmo., Ancien possesseur
+  410 = art., Technicien graphique
+  440 = ill., Illustrations / Graphisme
+  460 = ive., Participant
+  470 = ivr., Intervieweur
+  475 = isb., Collectivité éditrice
+  480 = lbt., Livret
+  530 = mte., Gravure
+  545 = itr., Instrumentiste
+  550 = nrt., Voix parlée
+  555 = opn., Membre du jury
+  557 = orm., Organisation du congrès
+  590 = prf., Exécutant
+  600 = pht., Photographie
+  610 = prt / prt-bsl., Imprimeur / Imprimeur-libraire
+  630 = pmn., Directeur de production
+  632 = ard., Scénographe / Chef costumier
+  633 = tcd., Accessoiriste
+  650 = pbl., Éditeur commercial
+  651 = pbd., Directeur de la publication
+  660 = rcp., Destinataire
+  690 = sce., Scénario
+  721 = sng., Chant
+  727 = ths., Directeur de thèse
+  730 = trl., Traduction
+  956 = 956., Président du jury de soutenance
+  958 = 958., 958 (Rapporteur du travail universitaire)
+  981 = 981., 981 (Laboratoire associé au travail universitaire)
+  982 = 982., 982 (Entreprise associée au travail universitaire)
+  984 = 984., 984 (Équipe de recherche associée au travail universitaire)
+  985 = 985., 985 (Autre partenaire associé au travail universitaire)
+  995 = 995., Organisme de cotutelle
+  996 = 996., Ecole doctorale associée au travail universitaire
+}
+
+# Leader/06, type of record
+table type {
+  a = a
+  b = t
+  c = c
+  d = d
+  e = e
+  f = f
+  g = g
+  i = i
+  j = j
+  k = k
+  l = m
+  m = o
+  r = r
+}
+
+# 214 2nd indicator (function) -> 264 2nd indicator
+table ind264 {
+  0 = 1
+  1 = 2
+  2 = 2
+  3 = 3
+  4 = 4
+}
+
+# ---- Leader and control fields --------------------------------------
+
+record -> LDR "{LDR/0-4}{LDR/5}{LDR/6|table(type)}{LDR/7} a2200000 i 4500"
+record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
+
+001 -> 001
+005 -> 005 "{/0-15}"
+
+# ---- 0XX ------------------------------------------------------------
+
+010 -> 020 [##] {
+  $a -> $a | replace('-', '')
+  $b -> += " ({|replace('\.$', '')})"
+  $d -> $c
+  $z -> $z | replace('-', '')
+}
+035 -> 035 [##] { $a -> $a ; $z -> $z }
+073 -> 024 [30] { $a -> $a }
+101 -> 041 [{@ind1}#] { $a -> $a ; $j -> $b ; $c -> $h ; $2 -> $2 }
+
+# ---- Content, media, carrier types ----------------------------------
+
+181 when $c -> 336 [##] { $c -> $b ; $2 -> $2 }
+182 when $c -> 337 [##] { $c -> $b ; $2 -> $2 }
+182 when $a -> 337 [##] { $a -> $b ; -> $2 "isbdmedia" ; order $b $2 }
+183 -> 338 [##] { $a -> $b ; $2 -> $2 }
+181 when $a -> 886 [2#] { -> $2 "unimarc" ; -> $a "181" ; $a -> $a ; $b -> $b }
+
+# ---- Description ----------------------------------------------------
+
+200 -> 245 [{700,710,720|exists(1,0)} {$a|nonfiling}] {
+  $a[1] -> $a | strip_nsb
+  $a[2..] -> $b {|strip_nsb} before " ;"
+  $e -> $b before " :"
+  $f[1] -> $c before " /"
+  $f[2..] -> += " ; {}"
+  $g -> += " ; {}"
+  $h -> $n before "."
+  $i -> $p before "."
+  end "."
+}
+205 -> 250 [##] { $a -> $a }
+214 -> 264 [#{@ind2|table(ind264)}] {
+  $a -> $a before " ;"
+  $c -> $b before " :"
+  $d -> $c before "," after $b
+  end "."
+}
+215 -> 300 [##] {
+  $a -> $a
+  $c -> $b before " :"
+  $d -> $c "{}." before ". ;" after $b before " ;"
+  $e -> $e before ". +" after $b before " +"
+}
+225 -> 490 [{410|exists(1,0)}#] {
+  $a -> $a | strip_nsb
+  $i -> += ". {}"
+  $x -> $x before ","
+  $v -> $v before " ;"
+}
+
+# ---- Notes ----------------------------------------------------------
+
+300 -> 500 [##] { $a -> $a ; end "." }
+320 -> 504 [##] { $a -> $a ; end "." }
+327 -> 505 [0#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
+328 -> 502 [##] { $b -> $a ; $c -> += " : {}" ; $e -> += " : {}" ; $d -> += " : {}" }
+330 -> 520 [##] { $a -> $a ; $2 -> $c ; end "." }
+
+# ---- Linking entries ------------------------------------------------
+
+410 -> 760 [0#] {
+  $t -> $t | strip_nsb
+  $c -> $d
+  $n -> += " : {}"
+  $d -> += ", {}"
+  $x -> $x
+  $v -> $g
+  $0 -> $w "(ABES){}"
+  order $t $d $x $g $w
+}
+410 -> 830 [#0] { $t -> $a | strip_nsb ; $v -> $v }
+
+# ---- Titles ---------------------------------------------------------
+
+517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b }
+
+# ---- Subjects -------------------------------------------------------
+
+606 when $2=rameau -> 650 [#7] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a ; $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $0 $1 $2
+}
+606 when $2=lc -> 650 [#0] {
+  $a -> $a ; $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2
+  end "." skip $2
+}
+608 when $2=rameau -> 655 [#7] like 606
+
+# ---- Classifications ------------------------------------------------
+
+676 -> 082 [0#] { $a -> $a ; $v -> $2 }
+680 -> 050 [#4] { $a -> $a ; $b -> $b }
+686 -> 084 [##] { $a -> $a ; $2 -> $2 ; end "." skip $2 }
+
+# ---- Names ----------------------------------------------------------
+
+700 -> 100 [{$b|exists(1,0)}#] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
+  $f -> $d "({})"
+  $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
+  order $0 $1 $a $d $4 $e
+  end "." skip $0 $1 $4 $e
+}
+701 -> 700 [{$b|exists(1,0)}#] like 700
+702 -> 700 [{$b|exists(1,0)}#] like 700
+710 -> 110 [2#] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a
+  $b -> $b
+  $c -> += " ({})"
+  $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
+  order $0 $1 $a $b $4 $e
+  end "." skip $0 $1 $4 $e
+}
+711 -> 710 [2#] like 710
+712 -> 710 [2#] like 710
+
+# ---- Electronic location --------------------------------------------
+
+856 -> 856 [##] { $* -> $* }

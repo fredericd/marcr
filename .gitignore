@@ -8,3 +8,4 @@ file.txt
 toto.log
 b.json
 CLAUDE.md
+marcr-rules/corpus/*.mrc

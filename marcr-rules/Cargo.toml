@@ -1,0 +1,29 @@
+[package]
+name = "marcr-rules"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Rule language to convert MARC records between formats (UNIMARC, MARC21), built on marcr"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/fredericd/marcr"
+keywords = ["marc", "unimarc", "marc21", "bibliographic", "library"]
+categories = ["parsing", "encoding"]
+readme = "README.md"
+# The corpus/ directory (Sudoc records) is not published
+include = ["src/**", "rules/*.rules", "README.md"]
+
+[features]
+default = ["cli"]
+# The marcr-rules command-line tool (convert, eval)
+cli = ["dep:clap", "dep:rayon"]
+
+[[bin]]
+name = "marcr-rules"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[dependencies]
+marcr = { path = "..", version = "0.5", default-features = false, features = ["parallel"] }
+regex = "1.13"
+clap = { version = "4.6.6", features = ["derive"], optional = true }
+rayon = { version = "1.12", optional = true }

@@ -53,3 +53,8 @@ strip = true        # Strips all debug symbols from the final binary
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
 tempfile = "3.27.0"
+
+# marcr-rules (conversion rules between MARC formats) lives in the same
+# repository; marcr itself stays the root package.
+[workspace]
+members = ["marcr-rules"]
