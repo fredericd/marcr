@@ -57,6 +57,29 @@ impl Field {
                 .map(|subfield| subfield.1.as_str()),
         }
     }
+
+    /// The values of every subfield with the given `code`, in order.
+    /// Empty for a control field.
+    ///
+    /// ```
+    /// use marcr::Record;
+    ///
+    /// let mut record = Record::default();
+    /// record.insert(vec![vec!["650", " 0", "a", "Poetry", "x", "History", "x", "Criticism"]]);
+    ///
+    /// let field = record.field(650).unwrap();
+    /// assert_eq!(field.subfields('x').collect::<Vec<_>>(), ["History", "Criticism"]);
+    /// ```
+    pub fn subfields(&self, code: char) -> impl Iterator<Item = &str> {
+        let subfields = match self {
+            Field::Control(_, _) => &[][..],
+            Field::Standard(_, _, subfields) => subfields.as_slice(),
+        };
+        subfields
+            .iter()
+            .filter(move |subfield| subfield.0 == code)
+            .map(|subfield| subfield.1.as_str())
+    }
 }
 
 impl fmt::Display for Field {

@@ -321,6 +321,11 @@ fn main() {
         println!("{title}");
     }
 
+    // Values of every $a subfield of every 610 field
+    for subject in record.fields_by_tag(610).flat_map(|field| field.subfields('a')) {
+        println!("{subject}");
+    }
+
     // Add a $2 subfield to every 610 field
     for field in record.fields_by_tag_mut(610) {
         if let Field::Standard(_, _, subfields) = field {
