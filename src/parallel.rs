@@ -21,11 +21,12 @@ use crate::{Error, Reader, Record, Writer};
 const BATCH_BYTES: usize = 4 * 1024 * 1024;
 /// Batches waiting for stage 2 (parsing, processing, serialization).
 const QUEUE: usize = 4;
-/// Serialized batches waiting for the output stage. Kept minimal: an
-/// output batch can be several times larger than its input (MARCXML),
-/// and when the output stage is the bottleneck a longer queue only adds
-/// memory, not speed.
-const DONE_QUEUE: usize = 1;
+/// Serialized batches waiting for the output stage. Kept short: an
+/// output batch can be several times larger than its input (MARCXML), and
+/// when the output stage is the bottleneck a longer queue only adds
+/// memory. A single batch would leave the writer idle at times (~5%
+/// slower MARCXML to MARCXML).
+const DONE_QUEUE: usize = 2;
 
 /// Counts returned by [`convert`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
