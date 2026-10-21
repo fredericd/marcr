@@ -74,8 +74,9 @@ value (the subfield is then not produced).
 SOURCE [when CONDITION]... -> TARGET
 ```
 
-The source is a tag pattern (`606`, `7..`), `record` (applied once per
-record) or `*` (fields that no other rule converted). Every rule whose
+The source is one or more tag patterns (`606`, `7..`, `300 301 302`),
+`record` (applied once per record) or `*` (fields that no other rule
+converted). Every rule whose
 source and conditions match a field applies: a field can produce several
 fields (`410 -> 760` and `410 -> 830`). The fields of the converted
 record are sorted by tag; fields that no rule converts are dropped.
@@ -120,8 +121,9 @@ once, before the others. Lines are separated by line breaks or `;`.
 Outputs, separated by commas:
 
 - `$c VALUE`: a subfield `$c`. Without a value, the source value is
-  copied. A subfield whose value is empty is not produced; a field
-  without subfields is not produced.
+  copied. A subfield whose value is empty is not produced, unless the
+  value is a literal (`-> $b ""`); a field without subfields is not
+  produced.
 - `+= VALUE`: appended to the last subfield produced.
 - `before "P"`, after a `$c` output: when the subfield is not the first
   of the field, `P` is appended to the subfield preceding it.
@@ -137,7 +139,9 @@ Block statements:
 
 ### Values and templates
 
-A value is a template string, `"..."` or `'...'`, where `{expression}`
+A value is a template string, `"..."` or `'...'` (`\\`, `\"`, `\'`,
+`\n` and `\t` are escapes, other backslashes are kept, as in regexes:
+`'\.$'`), where `{expression}`
 is replaced by its result (`{{` and `}}` for literal braces), or a single
 `{expression}`. Functions after the value apply to the whole result:
 `$a -> $a | replace('-', '')`.
@@ -164,6 +168,7 @@ by a space unless `join` is used.
 | `lower`, `upper`, `trim` | case, surrounding spaces |
 | `replace(REGEX, TEXT)` | replaces matches (`$1` for groups) |
 | `table(NAME[, COLUMN])` | looks the value up in a table |
+| `tr(NAME)` | looks each character up in a table (first column), keeping those missing |
 | `default(TEXT)` | `TEXT` if there is no value |
 | `exists(YES[, NO])` | `YES` if there is a value, else `NO` |
 | `join([SEPARATOR])` | joins several values (space by default) |

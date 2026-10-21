@@ -90,19 +90,188 @@ table type {
   r = r
 }
 
+# 073 2nd indicator -> 024 2nd indicator
+table ind024 {
+  0 = "#"
+  1 = 0
+}
+
+# 101 1st indicator (translation) -> 041 1st indicator
+table ind041 {
+  0 = 0
+  1 = 1
+  2 = 1
+  * = 0
+}
+
+# 225 1st indicator -> 490 1st indicator (series traced or not)
+table ind490 {
+  1 = 0
+  * = 1
+}
+
 # 214 2nd indicator (function) -> 264 2nd indicator
 table ind264 {
   0 = 1
-  1 = 2
+  1 = 0
   2 = 2
   3 = 3
   4 = 4
+}
+
+# 100 $a/8, type of publication date -> 008/06
+table datetype {
+  a = c
+  b = d
+  d = s
+  e = r
+  f = q
+  g = m
+  h = t
+  i = p
+  j = e
+}
+
+# 102 $a, ISO 3166 country -> MARC country code (008/15-17)
+# shortcut: only the countries found in the Sudoc corpus; add others from
+# the MARC Code List for Countries when needed.
+table country {
+  AR = "ag "
+  AT = "au "
+  BE = "be "
+  CA = "cn "
+  CG = "cf "
+  CH = "sz "
+  CZ = "xr "
+  DE = "gw "
+  ES = "sp "
+  FR = "fr "
+  GB = "uk "
+  GR = "gr "
+  IL = "is "
+  IN = "ii "
+  IT = "it "
+  JP = "ja "
+  KR = "ko "
+  LU = "lu "
+  MQ = "mq "
+  MX = "mx "
+  NL = "ne "
+  PK = "pk "
+  PL = "pl "
+  PT = "po "
+  RO = "rm "
+  RU = "ru "
+  SA = "su "
+  SE = "sw "
+  SG = "si "
+  SI = "xv "
+  UA = "un "
+  US = "us "
+  XX = "xx "
+  ZZ = "vp "
+}
+
+# 100 $a/17, target audience -> 008/22 (books)
+table audience {
+  a = j
+  k = f
+  m = g
+  u = " "
+}
+
+# 100 $a/20, government publication -> 008/28
+table government {
+  a = f
+  b = s
+  d = l
+  e = c
+  f = i
+  h = o
+  y = " "
+}
+
+# 105 $a/0-3, illustrations -> 008/18-21 (characters)
+table illustrations {
+  o = p
+  y = " "
+  " " = "#"
+}
+
+# 105 $a/4-7, form of contents -> 008/24-27 (characters)
+table contents {
+  a = b
+  b = c
+  c = i
+  d = a
+  e = d
+  f = e
+  g = r
+  i = s
+  j = p
+  k = j
+  l = u
+  n = l
+  p = t
+  r = n
+  s = z
+  t = " "
+  v = m
+  z = " "
+  7 = m
+}
+
+# 105 $a/11, literary form -> 008/33
+table literature {
+  a = 1
+  b = d
+  c = e
+  d = h
+  e = i
+  f = j
+  g = p
+  h = s
+  y = 0
+  z = m
+}
+
+# 105 $a/12, biography -> 008/34
+table biography {
+  y = " "
+}
+
+# 135 $a/0, type of computer file -> 008/26 (electronic resources)
+table filetype {
+  v = m
+}
+
+# 135 $a, coded data for electronic resources -> 007 (characters):
+# unknown "|" becomes "u", not applicable "#" becomes "|"
+table electronic {
+  "|" = u
+  "#" = "|"
+}
+
+# 115 $a/0, type of visual material -> 008/33 (videos)
+table visual {
+  a = m
+  c = v
 }
 
 # ---- Leader and control fields --------------------------------------
 
 record -> LDR "{LDR/0-4}{LDR/5}{LDR/6|table(type)}{LDR/7} a2200000 i 4500"
 record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
+
+# 008: dates and country, then the positions of the type of material,
+# then language. Date 2 is "||||" for a single date (d), its unknown
+# digits are "u". Illustrations are "||||" when 105 is not filled in.
+record when LDR~^.{6}[at] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx#')}{105a/0-4|replace('^y   \|$', '|||||')|replace('^(.{4}).$', '$1')|tr(illustrations)}{100a/17|tr(audience)}{106a/0|default(' ')}{105a/4-7|tr(contents)}{100a/20|tr(government)}{105a/8-10} {105a/11|tr(literature)}{105a/12|tr(biography)}{101a} d"
+record when LDR~^.{6}l -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx#')}||||{100a/17|tr(audience)}|||{135a/0|tr(filetype)|default('|')} {100a/20|tr(government)}||||||{101a} d"
+record when LDR~^.{6}g -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx#')}{115a/1-3}|{100a/17|tr(audience)}|||||{100a/20|tr(government)}    {115a/0|tr(visual)}l{101a} d"
+
+# 007 of electronic resources, from 135 (bit depth always "---")
+record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|tr(electronic)|default('uuu')}---{135a/8-12|tr(electronic)|default('uuuuu')}"
 
 001 -> 001
 005 -> 005 "{/0-15}"
@@ -116,8 +285,17 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
   $z -> $z | replace('-', '')
 }
 035 -> 035 [##] { $a -> $a ; $z -> $z }
-073 -> 024 [30] { $a -> $a }
-101 -> 041 [{@ind1}#] { $a -> $a ; $j -> $b ; $c -> $h ; $2 -> $2 }
+011 -> 022 [{@ind1}#] { $a -> $a ; $f -> $l ; $y -> $y ; $z -> $z }
+071 -> 028 [{@ind1}{@ind2}] { $a -> $a ; $b -> $b ; order $a $b }
+013 -> 024 [2#] { $a -> $a ; $b -> += " ({|replace('\.$', '')})" ; $d -> $c }
+017 -> 024 [7#] { $a -> $a ; $2 -> $2 }
+029 when $b -> 024 [7#] { $b -> $a ; -> $2 "FRnnt" ; order $a $2 }
+029 when $e -> 024 [8#] { $e -> $a ; -> $q "Thèse d'exercice" ; order $a $q }
+073 -> 024 [3{@ind2|table(ind024)}] { $a -> $a ; $b -> += " ({|replace('\.$', '')})" }
+101 -> 041 [{@ind1|table(ind041)}#] {
+  $a -> $a ; $d -> $b ; $j -> $b ; $c -> $h ; $i -> $g ; $h -> $e ; $e -> $f
+  $2 -> $2
+}
 
 # ---- Content, media, carrier types ----------------------------------
 
@@ -125,7 +303,7 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
 182 when $c -> 337 [##] { $c -> $b ; $2 -> $2 }
 182 when $a -> 337 [##] { $a -> $b ; -> $2 "isbdmedia" ; order $b $2 }
 183 -> 338 [##] { $a -> $b ; $2 -> $2 }
-181 when $a -> 886 [2#] { -> $2 "unimarc" ; -> $a "181" ; $a -> $a ; $b -> $b }
+181 when $a -> 886 [2#] { -> $2 "unimarc" ; -> $a "181" ; -> $b "" ; $a -> $a ; $b -> $b }
 
 # ---- Description ----------------------------------------------------
 
@@ -140,7 +318,10 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
   $i -> $p before "."
   end "."
 }
-205 -> 250 [##] { $a -> $a }
+# A final period, unless the statement ends with "]" or "."
+205 -> 250 [##] { $a -> $a | replace('([^\].])$', '$1.') }
+207 -> 362 [##] { $a -> $a }
+230 -> 256 [##] { $a -> $a ; end "." }
 214 -> 264 [#{@ind2|table(ind264)}] {
   $a -> $a before " ;"
   $c -> $b before " :"
@@ -153,38 +334,87 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
   $d -> $c "{}." before ". ;" after $b before " ;"
   $e -> $e before ". +" after $b before " +"
 }
-225 -> 490 [{410|exists(1,0)}#] {
+# The volume number of a subseries ($i) is not kept
+225 when !$i -> 490 [{@ind1|table(ind490)}#] {
+  $a -> $a | strip_nsb
+  $x -> $x before ","
+  $v -> $v before " ;"
+}
+225 when $i -> 490 [{@ind1|table(ind490)}#] {
   $a -> $a | strip_nsb
   $i -> += ". {}"
   $x -> $x before ","
-  $v -> $v before " ;"
 }
 
 # ---- Notes ----------------------------------------------------------
 
-300 -> 500 [##] { $a -> $a ; end "." }
+# General notes
+300 301 302 304 305 306 307 308 312 333 -> 500 [##] { $a -> $a ; end "." }
 320 -> 504 [##] { $a -> $a ; end "." }
 327 -> 505 [0#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
 328 -> 502 [##] { $b -> $a ; $c -> += " : {}" ; $e -> += " : {}" ; $d -> += " : {}" }
 330 -> 520 [##] { $a -> $a ; $2 -> $c ; end "." }
+314 -> 550 [##] { $a -> $a }
+324 -> 534 [##] { $a -> $a ; end "." }
+326 -> 310 [##] { $a -> $a }
+337 -> 538 [##] { $a -> $a ; end "." }
+371 -> 506 [##] { $8 -> $3 ; $a -> $a ; $c -> $e }
 
 # ---- Linking entries ------------------------------------------------
 
-410 -> 760 [0#] {
+# The ISSN is not kept with a volume number
+410 when !$v -> 760 [0#] {
   $t -> $t | strip_nsb
   $c -> $d
   $n -> += " : {}"
   $d -> += ", {}"
   $x -> $x
+  $0 -> $w "(ABES){}"
+  order $t $d $x $w
+}
+410 when $v -> 760 [0#] {
+  $t -> $t | strip_nsb
+  $c -> $d
+  $n -> += " : {}"
+  $d -> += ", {}"
   $v -> $g
   $0 -> $w "(ABES){}"
-  order $t $d $x $g $w
+  order $t $d $g $w
 }
-410 -> 830 [#0] { $t -> $a | strip_nsb ; $v -> $v }
+# Other physical format, with its title, responsibility, publication and
+# series composed as in an ISBD display
+452 456 -> 776 [0#] {
+  $t -> $t | strip_nsb
+  $h -> += ". {}"
+  $i -> += ",  {}"
+  $o -> += " : {}"
+  $f -> += " / {}"
+  $e -> $b
+  $c -> $d
+  $n -> += " : {}"
+  $d -> += ", {}"
+  $p -> $h
+  $s -> += ". (@{})"
+  $y -> $z
+  $0 -> $w "(ABES){}"
+  order $t $b $d $h $z $w
+}
+410 -> 830 [#{$t|nonfiling}] {
+  $t -> $a | strip_nsb
+  $d -> $f before "."
+  $v -> $v before " ;"
+}
 
 # ---- Titles ---------------------------------------------------------
 
 517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b }
+530 -> 222 [#0] { $a -> $a | strip_nsb ; $b -> $b }
+541 -> 242 [1{$a|nonfiling}] {
+  $a -> $a | strip_nsb
+  $e -> $b before " :"
+  $z -> $y
+  end "." skip $y
+}
 
 # ---- Subjects -------------------------------------------------------
 
@@ -200,6 +430,45 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
   end "." skip $2
 }
 608 when $2=rameau -> 655 [#7] like 606
+607 when $2=rameau -> 651 [#7] like 606
+607 when $2=lc -> 651 [#0] {
+  $a -> $a ; $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2
+  end "." skip $2
+}
+# Sovereigns (roman numeral in $d): qualifier before dates
+600 when $2=rameau when $d -> 600 [{$b|exists(1,0)}7] {
+  $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
+  $d -> $b
+  $c -> $c "({} ; "
+  $f -> $d "{$c|exists('', '(')}{})"
+  $t -> $t before "."
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  order $a $b $c $d
+  end "." skip $2
+}
+600 when $2=lc -> 600 [{$b|exists(1,0)}0] {
+  $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
+  $d -> $b
+  $f -> $d "({})"
+  $c -> $c
+  $t -> $t before "."
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2
+  end "." skip $2
+}
+600 when $2=rameau when !$d -> 600 [{$b|exists(1,0)}7] {
+  $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
+  $d -> $b
+  $f -> $d "({}{$c|exists('; ', ')')}"
+  $c -> $c "{})"
+  $t -> $t before "."
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $2
+}
+610 -> 653 [##] { $a -> $a | replace(',$', '') }
 
 # ---- Classifications ------------------------------------------------
 
@@ -212,9 +481,10 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
 700 -> 100 [{$b|exists(1,0)}#] {
   $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
   $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
-  $f -> $d "({})"
+  $f -> $d "({}{$c|exists('; ', ')')}"
+  $c -> $c "{})"
   $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
-  order $0 $1 $a $d $4 $e
+  order $0 $1 $a $d $c $4 $e
   end "." skip $0 $1 $4 $e
 }
 701 -> 700 [{$b|exists(1,0)}#] like 700
@@ -222,8 +492,10 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
 710 -> 110 [2#] {
   $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
   $a -> $a
-  $b -> $b
-  $c -> += " ({})"
+  $b -> $b before "."
+  $c[1] -> += " ({}"
+  $c[2..] -> += " / {}"
+  $c[-1] -> += ")"
   $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
   order $0 $1 $a $b $4 $e
   end "." skip $0 $1 $4 $e

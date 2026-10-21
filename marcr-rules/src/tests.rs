@@ -59,15 +59,15 @@ fn templates_and_functions() {
           $f -> $d "({})."
           $4 -> $4 {|table(roles)}, $e {|table(roles, 2)}
         }
-        010 -> 020 { $a -> $a | replace('-', '') }
+        010 -> 020 { $a -> $a | replace('-', '') ; $b -> += " ({|replace('\.$', '')})" }
         "#,
     );
     let source = record(vec![
-        vec!["010", "  ", "a", "978-2-07"],
+        vec!["010", "  ", "a", "978-2-07", "b", "br."],
         vec!["700", " 1", "3", "026764644", "a", "Camus", "b", "Albert", "f", "1913-1960", "4", "070", "4", "999"],
     ]);
     assert_eq!(lines(&rules.apply(&source)), [
-        "020 ## $a978207",
+        "020 ## $a978207 (br)",
         "100 1# $0(IdRef)026764644 $1http://www.idref.fr/026764644/id $aCamus, Albert $d(1913-1960). $4aut $eAuteur",
     ]);
 }
@@ -113,19 +113,21 @@ fn default_rule_and_like() {
     let rules = rules(
         r#"
         700 -> 100 [1#] { $a -> $a }
-        701 -> 700 like 700
-        * -> 886 [2#] { -> $2 "unimarc" ; -> $a "{@tag}" ; -> $b "{@ind}" ; $* -> $* }
+        701 702 -> 700 like 700
+        * -> 886 [2#] { -> $2 "unimarc" ; -> $a "{@tag}" ; -> $b "{@ind}" ; -> $c "" ; $* -> $* }
         "#,
     );
     let source = record(vec![
         vec!["181", " 1", "a", "i#", "b", "xxxe##"],
         vec!["700", " 1", "a", "Camus"],
         vec!["701", " 1", "a", "Sartre"],
+        vec!["702", " 1", "a", "Beauvoir"],
     ]);
     assert_eq!(lines(&rules.apply(&source)), [
         "100 1# $aCamus",
         "700 #1 $aSartre",
-        "886 2# $2unimarc $a181 $b 1 $ai# $bxxxe##",
+        "700 #1 $aBeauvoir",
+        "886 2# $2unimarc $a181 $b 1 $c $ai# $bxxxe##",
     ]);
 }
 
@@ -170,7 +172,7 @@ fn punctuation_and_order() {
 #[test]
 fn tables_header_and_defaults() {
     let rules = rules(
-        r#"
+        r##"
         rules "Test rules"
         version 1.2
         # comment
@@ -178,12 +180,17 @@ fn tables_header_and_defaults() {
           fre = French, "fr, FR"
           * = Unknown
         }
+        table blanks {
+          y = " "
+          " " = "#"
+        }
         101 -> 041 [##] { $a -> $a {|table(langs)}, $b {|table(langs, 2)} }
-        "#,
+        105 -> 008 "{$a|tr(blanks)}"
+        "##,
     );
     assert_eq!((rules.name(), rules.version()), (Some("Test rules"), Some("1.2")));
-    let source = record(vec![vec!["101", "0 ", "a", "fre", "a", "xxx"]]);
-    assert_eq!(lines(&rules.apply(&source)), ["041 ## $aFrench $bfr, FR $aUnknown"]);
+    let source = record(vec![vec!["101", "0 ", "a", "fre", "a", "xxx"], vec!["105", "  ", "a", "ay y"]]);
+    assert_eq!(lines(&rules.apply(&source)), ["008 a # ", "041 ## $aFrench $bfr, FR $aUnknown"]);
 }
 
 #[test]

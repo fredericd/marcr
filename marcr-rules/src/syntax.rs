@@ -20,7 +20,8 @@ impl TagPat {
 
 #[derive(Clone, Debug)]
 pub(crate) enum Source {
-    Tag(TagPat),
+    /// One or more tag patterns: `606`, `7..`, `300 301 302`.
+    Tags(Vec<TagPat>),
     /// Once per record.
     Record,
     /// Fields that no other rule converted.
@@ -162,6 +163,8 @@ pub(crate) enum Func {
     Replace(Regex, String),
     /// Table index, value column (1-based).
     Table(usize, usize),
+    /// Table index: each character looked up, kept if missing.
+    Tr(usize),
     Default(String),
     Exists(String, String),
     Join(String),
@@ -293,7 +296,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// A string literal, `"..."` or `'...'`, with `\` escapes.
+    /// A string literal, `"..."` or `'...'`. `\\`, `\"`, `\'`, `\n` and `\t`
+    /// are escapes; any other backslash is kept, for regexes (`'\.$'`).
     fn string(&mut self) -> Result<String> {
         let quote = match self.peek() {
             Some(q @ ('"' | '\'')) => q,
@@ -313,7 +317,11 @@ impl<'a> Parser<'a> {
                     match self.peek() {
                         Some('n') => s.push('\n'),
                         Some('t') => s.push('\t'),
-                        Some(c) => s.push(c),
+                        Some(c @ ('\\' | '"' | '\'')) => s.push(c),
+                        Some(c) => {
+                            s.push('\\');
+                            s.push(c);
+                        }
                         None => return self.error("unterminated string"),
                     }
                     self.pos += 1;
@@ -446,7 +454,22 @@ impl<'a> Parser<'a> {
             "record" => Source::Record,
             "*" => Source::Default,
             _ => match self.tag_pat(&word) {
-                Some(pat) => Source::Tag(pat),
+                Some(pat) => {
+                    let mut pats = vec![pat];
+                    loop {
+                        let save = self.pos;
+                        self.skip_spaces();
+                        let word = self.word();
+                        match self.tag_pat(&word) {
+                            Some(pat) => pats.push(pat),
+                            None => {
+                                self.pos = save;
+                                break;
+                            }
+                        }
+                    }
+                    Source::Tags(pats)
+                }
                 None => return self.error(format!("expected a rule, `rules`, `version` or `table`, found `{word}`")),
             },
         };
@@ -481,7 +504,7 @@ impl<'a> Parser<'a> {
                     self.skip_ws();
                     let word = self.word();
                     let pat = self.tag_pat(&word);
-                    let like = previous.iter().find(|rule| matches!(&rule.source, Source::Tag(p) if Some(p) == pat.as_ref()));
+                    let like = previous.iter().find(|rule| matches!(&rule.source, Source::Tags(p) if pat.as_ref().is_some_and(|pat| p.contains(pat))));
                     match like.map(|rule| &rule.target) {
                         Some(Target::Data { body, .. }) => body.clone(),
                         _ => return self.error(format!("no previous rule converting {word} to a data field")),
@@ -891,6 +914,13 @@ impl<'a> Parser<'a> {
                 match arg(1, "1").parse::<usize>() {
                     Ok(column) if column >= 1 => Func::Table(index, column),
                     _ => return self.error("table: the column is a number from 1"),
+                }
+            }
+            "tr" => {
+                arity(1, 1)?;
+                match self.table_names.iter().position(|t| *t == args[0]) {
+                    Some(index) => Func::Tr(index),
+                    None => return self.error(format!("unknown table `{}` (declare it with `table` first)", args[0])),
                 }
             }
             "default" => { arity(1, 1)?; Func::Default(arg(0, "")) }

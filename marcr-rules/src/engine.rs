@@ -49,7 +49,7 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
         let ctx = Ctx { field: Some(field), ..base };
         let mut converted = false;
         for rule in &parsed.rules {
-            if matches!(&rule.source, Source::Tag(pat) if pat.matches(*field.tag()))
+            if matches!(&rule.source, Source::Tags(pats) if pats.iter().any(|pat| pat.matches(*field.tag())))
                 && rule.conds.iter().all(|cond| test(cond, ctx))
             {
                 produce(&rule.target, ctx, &mut target);
@@ -76,10 +76,13 @@ fn data_field(tag: u16, inds: Option<&[Ind; 2]>, body: &Body, ctx: Ctx) -> Optio
         for output in outputs {
             match output {
                 Output::Sub(code, value, before) => {
-                    let value = render(value, ctx);
+                    // A literal is produced as written, even empty
+                    let literal = value.template.iter().all(|piece| matches!(piece, Piece::Text(_)));
+                    let text = render(value, ctx);
                     if let Some(code) = code.or(source_code)
-                        && !value.is_empty()
+                        && (literal || !text.is_empty())
                     {
+                        let value = text;
                         subfields.push((Subfield(code, value), before));
                     }
                 }
@@ -247,6 +250,17 @@ fn funcs(mut values: Vec<String>, funcs: &[Func], tables: &[Table]) -> Vec<Strin
                 .filter_map(|v| {
                     let table = &tables[*table];
                     table.entries.get(&v).or(table.default.as_ref()).and_then(|columns| columns.get(column - 1)).cloned()
+                })
+                .collect(),
+            Func::Tr(table) => values.into_iter()
+                .map(|v| {
+                    let table = &tables[*table];
+                    v.chars()
+                        .map(|c| match table.entries.get(c.encode_utf8(&mut [0; 4]) as &str).and_then(|values| values.first()) {
+                            Some(to) => to.clone(),
+                            None => c.to_string(),
+                        })
+                        .collect()
                 })
                 .collect(),
             Func::Default(default) => {
