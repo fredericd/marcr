@@ -19,8 +19,13 @@ use crate::{Error, Reader, Record, Writer};
 
 /// Approximate size of a batch of raw records.
 const BATCH_BYTES: usize = 4 * 1024 * 1024;
-/// Batches waiting between two stages.
+/// Batches waiting for stage 2 (parsing, processing, serialization).
 const QUEUE: usize = 4;
+/// Serialized batches waiting for the output stage. Kept minimal: an
+/// output batch can be several times larger than its input (MARCXML),
+/// and when the output stage is the bottleneck a longer queue only adds
+/// memory, not speed.
+const DONE_QUEUE: usize = 1;
 
 /// Counts returned by [`convert`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -107,7 +112,7 @@ where
     let input_format = reader.format;
     let output_format = writer.format;
     let (batch_tx, batch_rx) = sync_channel::<Batch>(QUEUE);
-    let (done_tx, done_rx) = sync_channel::<(Batch, Vec<Outcome>)>(QUEUE);
+    let (done_tx, done_rx) = sync_channel::<(Batch, Vec<Outcome>)>(DONE_QUEUE);
 
     std::thread::scope(|scope| {
         let splitter = scope.spawn(move || split(reader, batch_tx));
