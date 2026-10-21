@@ -556,6 +556,20 @@ fn iso2709_reader_non_ascii_subfield_code_does_not_panic() {
 }
 
 #[test]
+fn iso2709_serialize_rejects_wide_indicator_or_code() {
+    // Up to U+00FF a code is written as one byte and reads back unchanged.
+    let latin1 = Record::new(vec![Field::Standard(200, [' ', ' '], vec![Subfield('é', String::from("x"))])]);
+    let octets = Format::Iso2709.serialize(&latin1).unwrap();
+    assert_eq!(Format::Iso2709.deserialize(&octets).unwrap().field(200).unwrap().subfield('é'), Some("x"));
+
+    let code = Record::new(vec![Field::Standard(200, [' ', ' '], vec![Subfield('Ω', String::from("x"))])]);
+    let err = Format::Iso2709.serialize(&code).unwrap_err();
+    assert!(err.to_string().contains("field 200"), "{err}");
+    let indicator = Record::new(vec![Field::Standard(245, ['Ω', ' '], vec![])]);
+    assert!(Format::Iso2709.serialize(&indicator).is_err());
+}
+
+#[test]
 fn iso2709_serialize_rejects_tag_over_999() {
     let record = Record::new(vec![Field::Control(1000, String::from("x"))]);
     let err = Format::Iso2709.serialize(&record).unwrap_err();

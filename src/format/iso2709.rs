@@ -11,7 +11,8 @@ impl Format {
     ///
     /// Returns an error if a tag exceeds 999, a field 9999 bytes or the
     /// record 99999 bytes, the limits of the 3-, 4- and 5-digit numbers of
-    /// the format.
+    /// the format, or if an indicator or subfield code is beyond U+00FF
+    /// (they are written as a single byte).
     pub fn serialize_iso2709(&self, record: &Record) -> Result<Vec<u8>, Error> {
         // First pass: sizes, so that the record is written in a single
         // buffer allocated once.
@@ -20,6 +21,16 @@ impl Format {
             let tag = *field.tag();
             if tag > 999 {
                 return Err(Error::unwritable(Format::Iso2709, format!("invalid tag {tag} (max 999)")));
+            }
+            // Indicators and codes are written as one byte each. Up to
+            // U+00FF they read back as the same char (the reader maps a
+            // byte to a char), beyond they would be truncated.
+            if let Field::Standard(_, ind, subfields) = field {
+                let wide = ind.iter().chain(subfields.iter().map(|Subfield(code, _)| code))
+                    .find(|c| u8::try_from(**c).is_err());
+                if let Some(c) = wide {
+                    return Err(Error::unwritable(Format::Iso2709, format!("field {tag:03}: indicator or subfield code {c:?} does not fit in one byte")));
+                }
             }
             let len = field_len(field);
             if len > 9999 {
