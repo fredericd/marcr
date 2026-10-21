@@ -46,8 +46,6 @@ const FT: u8 = 0x1e; // Field terminator
 const RT: u8 = 0x1d; // Record terminator
 const DE: u8 = 0x1f; // Delimiter
 const DEFAULT_LEADER: [u8; 24] = *b"00000nam a2200000   4500";
-const XML_START_PREFIX: &[u8] = b"<record"; // without '>': the tag may carry attributes (xmlns, ...)
-const XML_END_TAG: &[u8] = b"</record>";
 
 /// Parses a fixed-width ASCII decimal number (ISO2709 directory), without
 /// going through the generic UTF-8 validation + FromStr of `str::parse`.

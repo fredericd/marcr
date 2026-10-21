@@ -245,6 +245,35 @@ fn marcxml_reader_accepts_start_tag_with_attributes() {
 }
 
 #[test]
+fn marcxml_reader_accepts_namespace_prefix() {
+    // SRU responses and OAI-PMH repositories often prefix MARCXML
+    // elements (<marc:record>); such records used to be skipped silently.
+    let xml = "<?xml version=\"1.0\"?>
+<marc:collection xmlns:marc=\"http://www.loc.gov/MARC21/slim\">
+<marc:records/>
+<marc:record>
+  <marc:leader>00146nam a2200073   4500</marc:leader>
+  <marc:controlfield tag=\"001\">000001</marc:controlfield>
+  <marc:controlfield tag=\"005\">2026</marc:controlfield>
+  <marc:datafield tag=\"200\" ind1=\" \" ind2=\"1\">
+    <marc:subfield code=\"a\">Mon titre</marc:subfield>
+    <marc:subfield code=\"e\">Complément du titre</marc:subfield>
+  </marc:datafield>
+  <marc:datafield tag=\"700\" ind1=\" \" ind2=\"1\">
+    <marc:subfield code=\"a\">Demians</marc:subfield>
+    <marc:subfield code=\"b\">Frédéric</marc:subfield>
+  </marc:datafield>
+</marc:record>
+<record><leader>00000nam a2200000   4500</leader><controlfield tag=\"001\">2</controlfield></record>
+</marc:collection>";
+    let records: Vec<Record> = Reader::new(Format::Marcxml, std::io::Cursor::new(xml))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].to_string(), EXPECTED_DEFAULT_RECORD);
+    assert_eq!(records[1].to_string(), "00000nam a2200000   4500\n001 2");
+}
+
+#[test]
 fn marcxml_reader_ignores_lookalike_tag() {
     // <records> must not be confused with <record>.
     let xml = "<records><record>

@@ -2,7 +2,7 @@ use std::io::{BufRead, Read};
 
 use memchr::memchr;
 
-use crate::{Error, Format, Record, RT, XML_END_TAG, XML_START_PREFIX};
+use crate::{Error, Format, Record, RT};
 
 /// Reads records in sequence from a stream `R`, in a given format.
 ///
@@ -71,8 +71,8 @@ impl<R: Read + BufRead> Reader<R> {
     }
 
     /// Reads the next MARCXML record, whatever `self.format`: looks for
-    /// the next `<record>` element (with or without attributes) then
-    /// captures up to and including `</record>`.
+    /// the next `<record>` element (with or without a namespace prefix or
+    /// attributes) then captures up to and including its closing tag.
     pub fn read_marcxml(&mut self) -> Result<Option<Record>, Error> {
         self.read_as(Format::Marcxml)
     }
@@ -160,23 +160,22 @@ impl<R: Read + BufRead> Reader<R> {
         Ok(option_result)
     }
 
-    /// MARCXML extraction: looks for the next `<record>` element (with or
-    /// without attributes, e.g. `xmlns="..."`) then captures up to and
-    /// including `</record>`.
+    /// MARCXML extraction: looks for the next `<record>` element, with or
+    /// without a namespace prefix (`<marc:record>`) or attributes (e.g.
+    /// `xmlns="..."`), then captures up to and including the matching
+    /// closing tag (`</record>`, `</marc:record>`).
     fn extract_marcxml<T>(&mut self, f: &mut impl FnMut(&[u8]) -> T) -> std::io::Result<Option<T>> {
         self.buffer.clear();
         let mut found = false;
         // Kept until the record bytes are consumed (see read_iso2709).
         let mut option_result = None;
 
-        // Locating <record>: matches the "<record" prefix, then checks
-        // that the next byte is indeed a tag-name boundary (space/tab/EOL
-        // or '>'), so as to accept <record>, <record ...> or
-        // <record xmlns="...">, without wrongly matching <records>.
-        enum State { Searching, OpenTag, Content }
+        // Locating <record>: after each '<', collects the tag name up to a
+        // tag-name boundary (space/tab/EOL, '>' or '/'), and keeps it if
+        // it is "record" or "prefix:record" — not "records", "recordData"...
+        enum State { Searching, Name, OpenTag, Content }
         let mut state = State::Searching;
-        let mut matched_start = 0; // progress within XML_START_PREFIX
-        let mut matched_end = 0;   // progress within XML_END_TAG
+        let mut end_tag: Vec<u8> = Vec::new(); // "</record>" or "</prefix:record>"
 
         while !found {
             // 1. Direct access to the BufReader's memory buffer
@@ -186,52 +185,61 @@ impl<R: Read + BufRead> Reader<R> {
             }
 
             let mut consumed = 0;
-            for &b in available {
-                consumed += 1;
+            while consumed < available.len() {
+                let b = available[consumed];
                 match state {
+                    State::Content => {
+                        // Jumps to the next '>', which may end the closing tag
+                        let rest = &available[consumed..];
+                        let len = memchr(b'>', rest).map_or(rest.len(), |pos| pos + 1);
+                        self.buffer.extend_from_slice(&rest[..len]);
+                        consumed += len;
+                        if self.buffer.ends_with(&end_tag) {
+                            found = true;
+                            option_result = Some(f(&self.buffer));
+                            break;
+                        }
+                        continue;
+                    },
                     State::Searching => {
-                        if b == XML_START_PREFIX[matched_start] {
-                            matched_start += 1;
-                            if matched_start == XML_START_PREFIX.len() {
-                                self.buffer.extend_from_slice(XML_START_PREFIX);
-                                state = State::OpenTag;
+                        if b == b'<' {
+                            self.buffer.push(b);
+                            state = State::Name;
+                        }
+                    },
+                    State::Name => {
+                        if b.is_ascii_whitespace() || b == b'>' || b == b'/' {
+                            let name = &self.buffer[1..];
+                            if name == b"record" || name.ends_with(b":record") {
+                                end_tag.clear();
+                                end_tag.extend_from_slice(b"</");
+                                end_tag.extend_from_slice(name);
+                                end_tag.push(b'>');
+                                self.buffer.push(b);
+                                state = if b == b'>' { State::Content } else { State::OpenTag };
+                            } else {
+                                self.buffer.clear();
+                                state = State::Searching;
                             }
-                        } else if b == XML_START_PREFIX[0] {
-                            matched_start = 1;
+                        } else if b == b'<' {
+                            self.buffer.clear();
+                            self.buffer.push(b);
+                        } else if self.buffer.len() > 64 {
+                            // Too long for a tag name (comment, CDATA...): give up
+                            self.buffer.clear();
+                            state = State::Searching;
                         } else {
-                            matched_start = 0;
+                            self.buffer.push(b);
                         }
                     },
                     State::OpenTag => {
-                        if self.buffer.len() == XML_START_PREFIX.len() && !(b.is_ascii_whitespace() || b == b'>') {
-                            // False positive (e.g. "<records"): cancel and
-                            // resume the search from this byte.
-                            self.buffer.clear();
-                            state = State::Searching;
-                            matched_start = if b == XML_START_PREFIX[0] { 1 } else { 0 };
-                            continue;
-                        }
                         self.buffer.push(b);
                         if b == b'>' {
                             state = State::Content;
                         }
                     },
-                    State::Content => {
-                        self.buffer.push(b);
-                        if b == XML_END_TAG[matched_end] {
-                            matched_end += 1;
-                            if matched_end == XML_END_TAG.len() {
-                                found = true;
-                                option_result = Some(f(&self.buffer));
-                                break;
-                            }
-                        } else if b == XML_END_TAG[0] {
-                            matched_end = 1;
-                        } else {
-                            matched_end = 0;
-                        }
-                    },
                 }
+                consumed += 1;
             }
 
             // 2. Tell the BufReader that `consumed` bytes have been processed

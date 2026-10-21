@@ -63,12 +63,20 @@ impl Format {
         octets
     }
 
-    /// Parses a MARCXML `<record>` element (attributes and namespace
-    /// ignored; only the `leader`, `controlfield`, `datafield` and
-    /// `subfield` elements are recognized). `octets` must be valid UTF-8.
+    /// Parses a MARCXML `<record>` element (attributes, namespace and
+    /// namespace prefix ignored; only the `leader`, `controlfield`,
+    /// `datafield` and `subfield` elements are recognized). `octets` must
+    /// be valid UTF-8.
     pub fn deserialize_marcxml(&self, octets: &[u8]) -> Result<Record, Error> {
         parse_marcxml(octets).map_err(|e| Error::malformed(Format::Marcxml, e.to_string()))
     }
+}
+
+/// True if the element `name` is `local`, with or without a namespace
+/// prefix (`marc:record`). Cheaper than `local_name()` on the hot path.
+fn is_element(name: &[u8], local: &[u8]) -> bool {
+    name == local
+        || (name.len() > local.len() && name.ends_with(local) && name[name.len() - local.len() - 1] == b':')
 }
 
 /// Parsing of [`Format::deserialize_marcxml`]. Errors come from several
@@ -82,17 +90,17 @@ fn parse_marcxml(octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf)? {
-            Event::Start(e) if e.name().as_ref() == b"record" => {
+            Event::Start(e) if is_element(e.name().as_ref(), b"record") => {
                 record = Record::default()
             }
-            Event::Start(e) if e.name().as_ref() == b"leader" => {
+            Event::Start(e) if is_element(e.name().as_ref(), b"leader") => {
                 let contenu = unescape(&reader.read_text(e.name())?.decode()?)?.into_owned();
                 let leader = contenu.as_bytes();
                 if leader.len() == 24 {
                     record.leader[..24].copy_from_slice(&leader[..24]);
                 }
             },
-            Event::Start(e) if e.name().as_ref() == b"controlfield" => {
+            Event::Start(e) if is_element(e.name().as_ref(), b"controlfield") => {
                 let tag = e.attributes()
                     .flatten()
                     .find(|attr| attr.key.as_ref() == b"tag")
@@ -105,7 +113,7 @@ fn parse_marcxml(octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
                     record.fields.push(cf);
                 }
             },
-            Event::Start(e) if e.name().as_ref() == b"datafield" => {
+            Event::Start(e) if is_element(e.name().as_ref(), b"datafield") => {
                 // Extract: tag, ind1, ind2
                 let mut tag: Option<u16> = None;
                 let mut ind1 = None;
@@ -126,7 +134,7 @@ fn parse_marcxml(octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
                     field = Some(Field::Standard(tag, [i1, i2], subfields));
                 }
             }
-            Event::Start(e) if e.name().as_ref() == b"subfield" => {
+            Event::Start(e) if is_element(e.name().as_ref(), b"subfield") => {
                 // Extract: code
                 let mut code = None;
                 for attr in e.attributes().flatten() {
@@ -149,7 +157,7 @@ fn parse_marcxml(octets: &[u8]) -> Result<Record, Box<dyn std::error::Error>> {
                     }
                 }
             },
-            Event::End(e) if e.name().as_ref() == b"datafield" => {
+            Event::End(e) if is_element(e.name().as_ref(), b"datafield") => {
                 if let Some(f) = field.take() {
                     record.fields.push(f);
                 }
