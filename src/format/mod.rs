@@ -5,6 +5,7 @@ use crate::{Error, Record};
 mod iso2709;
 mod json;
 mod marcxml;
+mod mrk;
 mod text;
 
 /// A MARC record format, used for (de)serialization via
@@ -30,10 +31,15 @@ pub enum Format {
   /// line-based tools (`wc -l`, `head`, `grep`) work on whole records;
   /// pipe the output through `jq .` to read it indented.
   Json,
+  /// MARCMaker / MarcEdit mnemonic format (`.mrk` extension), the text
+  /// format of cataloguing tools: `=245  10$aTitle`. Reading and writing
+  /// supported; records are separated by a blank line, as for
+  /// [`Format::Text`].
+  Mrk,
 }
 
 /// The format name, as used in error messages: `ISO 2709`, `MARCXML`,
-/// `Text` or `MARC-in-JSON`.
+/// `Text`, `MARC-in-JSON` or `MARCMaker`.
 impl fmt::Display for Format {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
@@ -41,6 +47,7 @@ impl fmt::Display for Format {
             Format::Marcxml => "MARCXML",
             Format::Text => "Text",
             Format::Json => "MARC-in-JSON",
+            Format::Mrk => "MARCMaker",
         })
     }
 }
@@ -79,6 +86,11 @@ impl Format {
                 description: String::from("MARC-in-JSON"),
                 extension: String::from("json"),
             },
+            RWDescription{
+                format: Format::Mrk,
+                description: String::from("MARCMaker / MarcEdit"),
+                extension: String::from("mrk"),
+            },
         ]
     }
 
@@ -93,6 +105,7 @@ impl Format {
             Format::Marcxml => self.deserialize_marcxml(octets),
             Format::Text => self.deserialize_text(octets),
             Format::Json => self.deserialize_json(octets),
+            Format::Mrk => self.deserialize_mrk(octets),
         }
     }
 
@@ -107,6 +120,7 @@ impl Format {
             Format::Marcxml => Ok(self.serialize_marcxml(record)),
             Format::Text => Ok(self.serialize_text(record)),
             Format::Json => Ok(self.serialize_json(record)),
+            Format::Mrk => Ok(self.serialize_mrk(record)),
         }
     }
 }

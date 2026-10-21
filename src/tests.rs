@@ -565,6 +565,76 @@ fn writer_rejects_record_without_writing_anything() {
 }
 
 #[test]
+fn mrk_serialize() {
+    let record = Record::new(vec![
+        Field::Control(8, String::from("850101s1985    nyu")),
+        Field::Standard(245, ['1', ' '], vec![
+            Subfield('a', String::from("Prix : 10 $ {net}")),
+            Subfield('b', String::from(r"a\b")),
+        ]),
+    ]);
+    let octets = Format::Mrk.serialize(&record).unwrap();
+    assert_eq!(
+        String::from_utf8(octets).unwrap(),
+        "=LDR  00000nam\\a2200000\\\\\\4500\n\
+         =008  850101s1985\\\\\\\\nyu\n\
+         =245  1\\$aPrix : 10 {dollar} {lcub}net{rcub}$ba{bsol}b\n",
+    );
+}
+
+#[test]
+fn mrk_roundtrip() {
+    let mut record = get_default_record();
+    record.add(Field::Control(8, String::from("  a {$} \\ ")));
+    record.add(Field::Standard(300, [' ', ' '], vec![
+        Subfield('a', String::from(r"$ \ { } {dollar} ")),
+        Subfield('b', String::new()),
+    ]));
+    record.add(Field::Standard(500, ['1', '2'], vec![]));
+    let octets = Format::Mrk.serialize(&record).unwrap();
+    let parsed = Format::Mrk.deserialize(&octets).unwrap();
+    assert_eq!(format!("{parsed:?}"), format!("{record:?}"));
+}
+
+#[test]
+fn mrk_reader_accepts_marcedit_files() {
+    // MarcEdit on Windows: UTF-8 BOM, CRLF line endings; files edited by
+    // hand may have several blank lines between records.
+    let input = "\u{feff}=LDR  00000nam\\\\2200000\\\\\\4500\r\n=001  1\r\n=245  10$aTitre\r\n\r\n\r\n\
+                 =LDR  00000nam\\\\2200000\\\\\\4500\r\n=001  2\r\n\r\n";
+    let records: Vec<Record> = Reader::new(Format::Mrk, std::io::Cursor::new(input))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].to_string(), "00000nam  2200000   4500\n001 1\n245 10 $a Titre");
+    assert_eq!(records[1].to_string(), "00000nam  2200000   4500\n001 2");
+}
+
+#[test]
+fn mrk_reader_multi_record_stream() {
+    let record = get_default_record();
+    let mut writer = Writer::new(Format::Mrk, Vec::new());
+    writer.write(&record).unwrap();
+    writer.write(&record).unwrap();
+    writer.finish().unwrap();
+    let octets = std::mem::take(&mut writer.writer);
+    let records: Vec<Record> = Reader::new(Format::Mrk, std::io::Cursor::new(octets))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records.len(), 2);
+    for parsed in records {
+        assert_eq!(parsed.to_string(), EXPECTED_DEFAULT_RECORD);
+    }
+}
+
+#[test]
+fn text_reader_accepts_crlf_and_extra_blank_lines() {
+    let input = "\n00146nam a2200073   4500\r\n001 000001\r\n\r\n\r\n\n00146nam a2200073   4500\n001 000002\n";
+    let records: Vec<Record> = Reader::new(Format::Text, std::io::Cursor::new(input))
+        .collect::<Result<_, _>>().unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[1].to_string(), "00146nam a2200073   4500\n001 000002");
+}
+
+#[test]
 fn json_serialize() {
     let record = Record::new(vec![
         Field::Control(1, String::from("PPN1")),
@@ -764,6 +834,7 @@ fn malformed_errors_name_their_format() {
         (Format::Marcxml, &b"<record><controlfield tag=\"xyz\">1</controlfield></record>"[..], "malformed MARCXML record: "),
         (Format::Text, &b"short leader\n"[..], "malformed Text record: "),
         (Format::Json, &br#"{"leader":"short","fields":[]}"#[..], "malformed MARC-in-JSON record: "),
+        (Format::Mrk, &b"=LDR  short\n"[..], "malformed MARCMaker record: "),
     ];
     for (format, octets, prefix) in cases {
         let err = format.deserialize(octets).unwrap_err();
@@ -826,7 +897,7 @@ mod parallel_tests {
     #[test]
     fn convert_matches_sequential_output() {
         let (raw, total) = input_records();
-        for to in [Format::Iso2709, Format::Marcxml, Format::Text, Format::Json] {
+        for to in [Format::Iso2709, Format::Marcxml, Format::Text, Format::Json, Format::Mrk] {
             let (expected, expected_skipped) = sequential(&raw, to);
             let reader = Reader::new(Format::Marcxml, std::io::Cursor::new(raw.clone()));
             let mut writer = Writer::new(to, Vec::new());

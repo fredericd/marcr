@@ -1,7 +1,7 @@
 # marcr
 
 Rust library and command-line tool to read and write MARC bibliographic
-records, converting between four formats:
+records, converting between five formats:
 
 - **ISO 2709** (`iso2709`) — the classic binary MARC exchange format.
 - **MARCXML** (`marcxml`) — the standardized XML representation (Library
@@ -14,6 +14,11 @@ records, converting between four formats:
   indented, each record is written compact on a single line, so that
   line-based tools (`wc -l`, `head`, `grep`) work on whole records; use
   `jq .` to read it indented.
+- **MARCMaker / MarcEdit** (`mrk`) — the mnemonic text format of
+  cataloguing tools (`=245  10$aTitle$bSubtitle`), with `\` for blanks
+  and `{dollar}`, `{bsol}`, `{lcub}`, `{rcub}` for `$`, `\`, `{`, `}`.
+  CRLF line endings and a UTF-8 BOM are accepted on input. MARC-8
+  mnemonics (`{eacute}`…) are not decoded: data must be UTF-8.
 
 ## Character encoding
 
@@ -26,7 +31,7 @@ Non-UTF-8 input is handled differently depending on the format:
 
 - **ISO 2709**: invalid bytes are replaced by the replacement character
   `�` (U+FFFD), **without any warning**; the record is otherwise read.
-- **MARCXML**, **text** and **MARC-in-JSON**: the record is rejected as malformed (reported
+- **MARCXML**, **text**, **MARC-in-JSON** and **MARCMaker**: the record is rejected as malformed (reported
   and skipped by the command-line tool).
 
 The leader's character coding position (09) is neither checked on input
@@ -51,9 +56,9 @@ marcr [OPTIONS] [FILES]...
 
 Options:
   -d, --deserialize <FORMAT>  Format of the input files [default: iso2709]
-                              [possible values: iso2709, marcxml, text, json]
+                              [possible values: iso2709, marcxml, text, json, mrk]
   -s, --serialize <FORMAT>    Format of the output file [default: text]
-                              [possible values: iso2709, marcxml, text, json]
+                              [possible values: iso2709, marcxml, text, json, mrk]
   -o, --output <NAME>         Name of the output file (stdout otherwise)
   -j, --jobs <N>              Number of threads used to process records
                               [default: one per core]
@@ -382,6 +387,7 @@ src/format/iso2709.rs ISO 2709 (de)serialization
 src/format/marcxml.rs MARCXML (de)serialization
 src/format/text.rs    Text format (de)serialization
 src/format/json.rs    MARC-in-JSON (de)serialization
+src/format/mrk.rs     MARCMaker / MarcEdit (.mrk) (de)serialization
 src/error.rs          marcr::Error
 src/reader.rs         Reader
 src/writer.rs         Writer

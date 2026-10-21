@@ -1,12 +1,12 @@
 //! Reading and writing MARC bibliographic records in several formats:
 //! ISO 2709 ([`Format::Iso2709`]), MARCXML ([`Format::Marcxml`]),
-//! MARC-in-JSON ([`Format::Json`]) and a human-readable text format
-//! ([`Format::Text`]).
+//! MARC-in-JSON ([`Format::Json`]), MARCMaker / MarcEdit
+//! ([`Format::Mrk`]) and a human-readable text format ([`Format::Text`]).
 //!
 //! All data is expected to be UTF-8 encoded, and is written as UTF-8.
 //! Other MARC encodings (MARC-8, ISO 5426…) are not supported: invalid
 //! UTF-8 bytes are replaced by U+FFFD when reading ISO 2709, and make the
-//! record invalid when reading MARCXML, MARC-in-JSON or text.
+//! record invalid when reading the other formats.
 //!
 //! [`Record`] represents a record (leader + fields), [`Reader`] reads
 //! records from a stream regardless of format, [`Writer`] writes them to

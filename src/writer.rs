@@ -11,7 +11,7 @@ const XML_HEADER: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<collect
 /// `<collection>` element are written automatically (opened on the first
 /// [`Writer::write`], closed by [`Writer::finish`]; an empty but valid
 /// collection is written if no record was); likewise for [`Format::Json`],
-/// with an enclosing JSON array. For [`Format::Text`] and
+/// with an enclosing JSON array. For [`Format::Text`], [`Format::Mrk`] and
 /// [`Format::Marcxml`], successive records are separated by a blank line.
 ///
 /// Call [`Writer::finish`] once done, to close the output and get any
@@ -64,7 +64,7 @@ impl<W: Write> Writer<W> {
         }
         if self.count > 0 {
             match self.format {
-                Format::Text | Format::Marcxml => self.writer.write_all(b"\n")?,
+                Format::Text | Format::Marcxml | Format::Mrk => self.writer.write_all(b"\n")?,
                 Format::Json => self.writer.write_all(b",\n")?,
                 Format::Iso2709 => (),
             }

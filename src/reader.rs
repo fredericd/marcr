@@ -90,6 +90,12 @@ impl<R: Read + BufRead> Reader<R> {
         self.read_as(Format::Json)
     }
 
+    /// Reads the next MARCMaker (`.mrk`) record, whatever `self.format`:
+    /// records are separated by a blank line, as for [`Reader::read_text`].
+    pub fn read_mrk(&mut self) -> Result<Option<Record>, Error> {
+        self.read_as(Format::Mrk)
+    }
+
     /// Extracts and parses the next record in `format`.
     fn read_as(&mut self, format: Format) -> Result<Option<Record>, Error> {
         match self.extract(format, |octets| format.deserialize(octets))? {
@@ -111,7 +117,7 @@ impl<R: Read + BufRead> Reader<R> {
         let value = match format {
             Format::Iso2709 => self.extract_iso2709(&mut f)?,
             Format::Marcxml => self.extract_marcxml(&mut f)?,
-            Format::Text    => self.extract_text(&mut f)?,
+            Format::Text | Format::Mrk => self.extract_text(&mut f)?,
             Format::Json    => self.extract_json(&mut f)?,
         };
         Ok(value.map(|value| {
@@ -249,9 +255,10 @@ impl<R: Read + BufRead> Reader<R> {
         Ok(option_result)
     }
 
-    /// Text extraction: accumulates bytes until a blank line (two
-    /// consecutive `\n` bytes), which separates two records — the
-    /// separator produced by [`crate::Writer`] for this format. The last
+    /// Text and MARCMaker extraction: accumulates bytes until a blank line
+    /// (`\n\n`, or `\n\r\n` with CRLF line endings), which separates two
+    /// records — the separator produced by [`crate::Writer`] for these
+    /// formats. Extra blank lines between records are skipped. The last
     /// record in the stream, not followed by a blank line, is accepted at
     /// end of stream (EOF) if there is accumulated content left.
     fn extract_text<T>(&mut self, f: &mut impl FnMut(&[u8]) -> T) -> std::io::Result<Option<T>> {
@@ -274,9 +281,14 @@ impl<R: Read + BufRead> Reader<R> {
             let mut consumed = 0;
             for &b in available {
                 consumed += 1;
-                if b == b'\n' && self.buffer.last() == Some(&b'\n') {
-                    // Two consecutive '\n': separating blank line, not
-                    // included in the record.
+                if self.buffer.is_empty() && (b == b'\n' || b == b'\r') {
+                    continue; // Extra blank line before a record
+                }
+                if b == b'\n' && (self.buffer.ends_with(b"\n") || self.buffer.ends_with(b"\n\r")) {
+                    // Separating blank line, not included in the record.
+                    if self.buffer.ends_with(b"\r") {
+                        self.buffer.pop();
+                    }
                     found = true;
                     option_result = Some(f(&self.buffer));
                     break;
@@ -288,6 +300,7 @@ impl<R: Read + BufRead> Reader<R> {
         }
         Ok(option_result)
     }
+
     /// MARC-in-JSON extraction: captures the next top-level `{...}`
     /// object, counting braces outside JSON strings. Bytes between
     /// objects (`[`, `,`, `]`, whitespace) are skipped, so that a JSON
