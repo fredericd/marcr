@@ -191,7 +191,18 @@ value. `!` negates. Several `when` must all hold.
 
 ## Corpus
 
-`corpus/` holds 1,290 Sudoc records fetched in UNIMARC and in MARC21
-from the Abes public Z39.50 server, to write and evaluate the rules;
-`corpus/fetch.sh` fetches them again from `corpus/ppn.txt`. The corpus
-is not part of the published crate.
+`corpus/` holds the PPNs of Sudoc records, fetched in UNIMARC and in
+MARC21 from the Abes public Z39.50 server, to write and evaluate the
+rules: 2,340 records in `ppn.txt` to work on, and 400 others in
+`ppn-test.txt`, kept aside to check that the rules hold on records not
+looked at while writing them.
+
+```sh
+corpus/fetch.sh                      # unimarc.mrc, marc21.mrc
+corpus/fetch.sh ppn-test.txt test    # unimarc-test.mrc, marc21-test.mrc
+corpus/sample.sh 50 k m -x corpus/ppn.txt >> corpus/ppn.txt   # 50 more maps and scores
+```
+
+`sample.sh` picks random PPNs by type of document from the Sudoc SRU
+server. The records themselves are not part of the repository nor of
+the published crate.
