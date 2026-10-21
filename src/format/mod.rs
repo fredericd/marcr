@@ -24,7 +24,11 @@ pub enum Format {
   /// MARC-in-JSON, one JSON object per record (`.json` extension).
   /// Reading and writing supported; [`crate::Writer`] produces a JSON
   /// array of records, [`crate::Reader`] accepts an array as well as
-  /// concatenated objects (JSON Lines, for instance).
+  /// concatenated objects (JSON Lines, for instance), indented or not.
+  ///
+  /// Unlike MARCXML, records are written compact, one per line, so that
+  /// line-based tools (`wc -l`, `head`, `grep`) work on whole records;
+  /// pipe the output through `jq .` to read it indented.
   Json,
 }
 

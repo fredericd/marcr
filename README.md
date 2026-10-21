@@ -10,7 +10,10 @@ records, converting between four formats:
   field.
 - **MARC-in-JSON** (`json`) — the JSON representation of MARC records;
   written as a JSON array, read from an array or from concatenated
-  objects (JSON Lines).
+  objects (JSON Lines), indented or not. Unlike MARCXML, which is
+  indented, each record is written compact on a single line, so that
+  line-based tools (`wc -l`, `head`, `grep`) work on whole records; use
+  `jq .` to read it indented.
 
 ## Character encoding
 
