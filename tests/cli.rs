@@ -199,3 +199,46 @@ fn rejects_zero_jobs() {
         .assert()
         .failure();
 }
+
+#[test]
+fn fields_writes_a_tsv_table() {
+    cmd()
+        .args(["-d", "marcxml", "--fields", "001,101a,700a", SAMPLE])
+        .assert()
+        .success()
+        .stdout("001\t101a\t700a\n1\tfre\t\n2\tfre\t\n");
+}
+
+#[test]
+fn skip_and_limit_apply_across_input_files() {
+    // Two copies of the two-record sample: records 1 2 1 2, keep the 2nd and 3rd.
+    cmd()
+        .args(["-d", "marcxml", "--fields", "001", "--skip", "1", "--limit", "2", SAMPLE, SAMPLE])
+        .assert()
+        .success()
+        .stdout("001\n2\n1\n");
+}
+
+#[test]
+fn where_filters_records() {
+    cmd()
+        .args(["-d", "marcxml", "--fields", "001", "--where", "200a~Temps", "--where", "101a=fre", SAMPLE])
+        .assert()
+        .success()
+        .stdout("001\n1\n");
+    // Also in record mode, through marcr::parallel
+    cmd()
+        .args(["-d", "marcxml", "-s", "text", "--where", "!200a~Temps", SAMPLE])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Bulletin").and(predicate::str::contains("Temps").not()));
+}
+
+#[test]
+fn invalid_where_is_rejected() {
+    cmd()
+        .args(["--where", "200a~("])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--where"));
+}

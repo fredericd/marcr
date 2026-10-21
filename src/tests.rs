@@ -1033,3 +1033,17 @@ mod parallel_tests {
         assert!(result.is_err_and(|e| e.is_io()));
     }
 }
+
+#[test]
+fn reader_skip_records_and_stop_after() {
+    let mut octets = Vec::new();
+    for id in ["1", "2", "3", "4"] {
+        octets.extend(Format::Iso2709.serialize(&Record::new(vec![Field::Control(1, id.to_string())])).unwrap());
+    }
+    let mut reader = Reader::new(Format::Iso2709, std::io::Cursor::new(octets));
+    assert_eq!(reader.skip_records(1).unwrap(), 1);
+    reader.stop_after(reader.count + 2);
+    let ids: Vec<String> = (&mut reader).map(|r| r.unwrap().field(1).unwrap().to_string()).collect();
+    assert_eq!(ids, ["001 2", "001 3"]);
+    assert_eq!(reader.skip_records(5).unwrap(), 0); // stopped
+}

@@ -62,6 +62,12 @@ Options:
   -o, --output <NAME>         Name of the output file (stdout otherwise)
   -j, --jobs <N>              Number of threads used to process records
                               [default: one per core]
+      --skip <N>              Skip the first N records of the input
+      --limit <N>             Read at most N records of the input
+                              (after --skip, before --where)
+      --where <CONDITION>     Keep only the records meeting CONDITION
+                              (repeatable, see below)
+      --fields <TAG[c],...>   Write a tab-separated table instead of records
   -h, --help                  Print help
   -V, --version                Print version
 ```
@@ -106,6 +112,47 @@ Merge several ISO2709 files into one:
 
 ```sh
 marcr -d iso2709 -s iso2709 -o merged.mrc a.mrc b.mrc c.mrc
+```
+
+### Selecting and extracting records
+
+`--skip` and `--limit` count records of the input, across all the input
+files, whether they are then kept by `--where` or not. Reading stops once
+the limit is reached.
+
+`--where` keeps the records meeting a condition; repeated, all the
+conditions must hold. A condition designates a field by its tag (`856`)
+or a subfield by its tag and code (`101a`), then optionally tests its
+values: `=VALUE` (one is equal to VALUE) or `~REGEX` (one matches the
+[regular expression](https://docs.rs/regex/latest/regex/#syntax)
+REGEX). Without a test, the field or subfield must exist. A leading `!`
+negates the condition. Without a subfield code, the value of a standard
+field is its subfields joined by a space.
+
+`--fields` writes a tab-separated table (TSV) instead of records: a
+header line, then one line per record, with one column per field or
+subfield, repeated values joined by `|`.
+
+Note that UNIMARC records (BnF, Sudoc) often surround the non-sorting part
+of a title with the invisible characters NSB and NSE (U+0098, U+009C):
+`200a~^Le` does not match `\u{98}Le \u{9c}Temps de vivre`.
+
+Extract a sample of 100 records, after the first 1000:
+
+```sh
+marcr -s iso2709 --skip 1000 --limit 100 -o sample.mrc notices.mrc
+```
+
+Records in Latin without an 856 field:
+
+```sh
+marcr -s iso2709 --where 101a=lat --where '!856' -o latin.mrc notices.mrc
+```
+
+Identifier, title and authors of the records with an ISBN, as a table:
+
+```sh
+marcr --where 010a --fields 001,200a,700a,701a notices.mrc > notices.tsv
 ```
 
 ## Library usage
@@ -153,6 +200,10 @@ A `Reader` is also an iterator over `Result<Record, marcr::Error>`:
 `for result in &mut reader { ... }`. `reader.count` is the number of
 records extracted from the stream so far, malformed ones included, and
 `writer.count` the number of records written.
+
+`reader.skip_records(n)` skips the next `n` records without parsing them,
+and `reader.stop_after(reader.count + n)` ends the stream after `n` more
+records, also for [`marcr::parallel`](#parallel-processing).
 
 ### Error handling
 
@@ -400,6 +451,7 @@ src/reader.rs         Reader
 src/writer.rs         Writer
 src/tests.rs          Library unit tests
 src/main.rs           Command-line interface (clap)
+src/query.rs          CLI --where conditions and --fields table
 src/parallel.rs       marcr::parallel, multi-core processing (feature "parallel")
 tests/cli.rs          Binary integration tests
 bench/bench.sh        Benchmark against yaz-marcdump

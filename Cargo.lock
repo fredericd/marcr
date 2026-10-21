@@ -264,6 +264,7 @@ dependencies = [
  "predicates",
  "quick-xml",
  "rayon",
+ "regex",
  "serde_json",
  "tempfile",
 ]

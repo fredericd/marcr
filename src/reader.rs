@@ -43,6 +43,8 @@ pub struct Reader<R> {
     io_failed: bool,
     /// Bytes consumed from the stream so far, to locate malformed records.
     position: u64,
+    /// Number of the last record to read, set by [`Reader::stop_after`].
+    last: Option<usize>,
 }
 
 impl<R: Read + BufRead> Reader<R> {
@@ -50,7 +52,7 @@ impl<R: Read + BufRead> Reader<R> {
     pub fn new(format: Format, reader: R) -> Self {
         let buffer: Vec<u8> = Vec::new();
         let count = 0;
-        Self { format, reader, buffer, count, io_failed: false, position: 0 }
+        Self { format, reader, buffer, count, io_failed: false, position: 0, last: None }
     }
 
     /// Reads and parses the next record from the stream.
@@ -96,6 +98,24 @@ impl<R: Read + BufRead> Reader<R> {
         self.read_as(Format::Mrk)
     }
 
+    /// Skips the next `n` records without parsing them, malformed ones
+    /// included (they are counted in [`Reader::count`]). Returns how many
+    /// were skipped: fewer than `n` if the stream ends first.
+    pub fn skip_records(&mut self, n: usize) -> std::io::Result<usize> {
+        let mut skipped = 0;
+        while skipped < n && self.extract(self.format, |_| ())?.is_some() {
+            skipped += 1;
+        }
+        Ok(skipped)
+    }
+
+    /// Ends the stream after record number `last` (see [`Reader::count`]):
+    /// reading then returns `Ok(None)`, as at end of stream. To read at
+    /// most `n` more records: `reader.stop_after(reader.count + n)`.
+    pub fn stop_after(&mut self, last: usize) {
+        self.last = Some(last);
+    }
+
     /// Extracts and parses the next record in `format`.
     fn read_as(&mut self, format: Format) -> Result<Option<Record>, Error> {
         match self.extract(format, |octets| format.deserialize(octets))? {
@@ -113,6 +133,9 @@ impl<R: Read + BufRead> Reader<R> {
         format: Format,
         mut f: impl FnMut(&[u8]) -> T,
     ) -> std::io::Result<Option<(T, usize, u64)>> {
+        if self.last.is_some_and(|last| self.count >= last) {
+            return Ok(None);
+        }
         let start = self.position;
         let value = match format {
             Format::Iso2709 => self.extract_iso2709(&mut f)?,
