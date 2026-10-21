@@ -355,7 +355,7 @@ marcr's) and the peak memory:
 | ISO 2709 → MARCXML   | 13.91 s · 8.3 MB | 9.46 s · ×1.5 · 63 MB    | 2.02 s · ×6.9 · 71 MB    |
 | ISO 2709 → text      | 3.57 s · 8.2 MB  | 2.93 s · ×1.2 · 47 MB    | 0.55 s · ×6.5 · 46 MB    |
 | ISO 2709 → JSON      | 6.82 s · 8.4 MB  | 3.24 s · ×2.1 · 55 MB    | 0.66 s · ×10.3 · 58 MB   |
-| MARCXML → ISO 2709   | 25.55 s · 9.2 MB | 9.70 s · ×2.6 · 36 MB    | 3.44 s · ×7.4 · 22 MB    |
+| MARCXML → ISO 2709   | 25.55 s · 9.2 MB | 9.61 s · ×2.7 · 36 MB    | 2.00 s · ×12.8 · 39 MB   |
 
 `yaz-marcdump` writes indented JSON, `marcr` one record per line. There
 is no JSON input case: `yaz-marcdump` only reads a single-record JSON
