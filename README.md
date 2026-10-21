@@ -115,7 +115,7 @@ the library, without pulling in `clap`, disable default features:
 
 ```toml
 [dependencies]
-marcr = { version = "0.4", default-features = false }
+marcr = { version = "0.5", default-features = false }
 ```
 
 ### Reading and writing
