@@ -1,6 +1,6 @@
 [package]
 name = "marcr"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 rust-version = "1.88"
 description = "Read and write MARC bibliographic records in ISO 2709, MARCXML, MARC-in-JSON, MARCMaker (.mrk) and text formats"
