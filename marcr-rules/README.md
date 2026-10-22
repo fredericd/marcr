@@ -74,7 +74,7 @@ table langs {
 One entry per line. Keys and values are trimmed; quote one that contains
 a comma. `{|table(langs)}` gives the first value column of the key,
 `{|table(langs, 2)}` the second. A missing key gives the `*` entry, or no
-value (the subfield is then not produced).
+value (the subfield is then not produced). An empty value stays empty.
 
 ### Rules
 
@@ -98,7 +98,12 @@ LDR "template"                  # the leader
 001                             # a control field, copying the value
 245 [IND] { BODY }              # a data field
 701 -> 700 [IND] like 700       # the body of the first rule from 700
+880 -> linked                   # the rules of the tag in its $6
 ```
+
+`linked` converts a field (880, alternate graphic representation) as if
+it had the tag that starts its `$6` (`245-03/(2/r`), with its indicators
+and subfields, `$6` included.
 
 Indicators are two characters, `#` for a blank, or `{expressions}`:
 `[#7]`, `[{@ind2}#]`, `[{700,710|exists(1,0)} {$a|nonfiling}]`. Without
@@ -148,6 +153,17 @@ Block statements:
   `order $a $* $2`), before punctuation.
 - `end "P" [skip $x ...]`: `P` is appended to the last subfield not
   skipped, unless it already ends with `P`.
+
+### Common lines
+
+```
+common {
+  $6 -> $6 | replace('^\d{3}-(\d\d).*$', 'a$1')
+}
+```
+
+The lines of a `common` block are added at the start of every data field
+body, and the subfields they produce stay first whatever `order` says.
 
 ### Values and templates
 

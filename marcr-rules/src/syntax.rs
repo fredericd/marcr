@@ -43,6 +43,8 @@ pub(crate) enum Target {
     Leader(Value),
     Control(u16, Value),
     Data { tag: u16, inds: Option<[Ind; 2]>, body: Body },
+    /// `linked`: converted by the rules of the tag in its `$6` (880).
+    Linked,
 }
 
 /// The block of a data field rule.
@@ -368,6 +370,7 @@ impl<'a> Parser<'a> {
     /// The whole file.
     pub(crate) fn file(mut self) -> Result<Parsed> {
         let mut parsed = Parsed { name: None, version: None, rules: Vec::new(), tables: Vec::new() };
+        let mut common: Option<Body> = None;
         loop {
             self.skip_ws();
             if self.at_end() {
@@ -400,10 +403,34 @@ impl<'a> Parser<'a> {
                     parsed.tables.push(Table { name: name.clone(), ..self.table()? });
                     self.table_names.push(name);
                 }
+                "common" => {
+                    self.skip_ws();
+                    self.expect("{")?;
+                    common = Some(self.body()?);
+                }
                 _ => {
                     self.pos = start;
                     let rule = self.rule(&parsed.rules)?;
                     parsed.rules.push(rule);
+                }
+            }
+        }
+        if let Some(common) = common {
+            // Its subfields come first, whatever `order` says
+            let mut codes: Vec<char> = Vec::new();
+            for output in common.lines.iter().flat_map(|line| &line.outputs) {
+                if let Output::Sub(Some(code), ..) = output
+                    && !codes.contains(code)
+                {
+                    codes.push(*code);
+                }
+            }
+            for rule in &mut parsed.rules {
+                if let Target::Data { body, .. } = &mut rule.target {
+                    body.lines.splice(0..0, common.lines.iter().cloned());
+                    if !body.order.is_empty() {
+                        body.order.splice(0..0, codes.iter().copied());
+                    }
                 }
             }
         }
@@ -503,7 +530,9 @@ impl<'a> Parser<'a> {
             conds.push(self.cond()?);
         }
         self.skip_ws();
-        let target = if self.eat("LDR") {
+        let target = if self.keyword("linked") {
+            Target::Linked
+        } else if self.eat("LDR") {
             self.skip_ws();
             Target::Leader(self.value()?)
         } else {

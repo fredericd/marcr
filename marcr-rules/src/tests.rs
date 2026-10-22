@@ -243,6 +243,23 @@ fn order_with_the_other_codes_in_place() {
 }
 
 #[test]
+fn linked_fields_and_common_lines() {
+    let rules = rules(
+        r#"common { $6 -> $6 | replace('^\d{3}-(\d\d).*$', 'a$1'), $7 | replace('^[^/]*$', '') | replace('^.*/\(2.*$', 'ha') }
+        245 -> 200 [1#] { $a -> $a ; order $a }
+        880 -> linked
+        "#,
+    );
+    let source = record(vec![
+        vec!["245", "10", "6", "880-01", "a", "Hisṭoryah"],
+        vec!["880", "10", "6", "245-01/(2/r", "a", "היסטוריה"],
+    ]);
+    assert_eq!(lines(&rules.apply(&source)), ["200 1# $6a01 $aHisṭoryah", "200 1# $6a01 $7ha $aהיסטוריה"]);
+    let (_, report) = rules.apply_with_report(&source);
+    assert!(report.unconverted_fields.is_empty() && report.unconverted_subfields.is_empty());
+}
+
+#[test]
 fn conditions_on_the_source_value() {
     let rules = rules("007 when ~^s -> 126 [##] { -> $a '{/1}' }\n007 when !~^s -> 135 [##] { -> $a '{/1}' }");
     let source = record(vec![vec!["007", "sd fsngnnmmned"], vec!["007", "cr |||||||||||"]]);
@@ -275,7 +292,7 @@ fn report_lists_what_is_left_out() {
         vec!["330", "  ", "a", "Résumé"],
     ]);
     let (converted, report) = rules.apply_with_report(&source);
-    assert_eq!(lines(&converted), lines(&rules.apply(&source)));
+    assert_eq!(converted, rules.apply(&source));
     // 100 is read by an expression, 200$e by a template
     assert_eq!(report.unconverted_fields, [330]);
     assert_eq!(report.unconverted_subfields, [(101, 'c'), (200, 'f')]);

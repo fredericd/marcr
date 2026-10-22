@@ -6,7 +6,7 @@ use marcr::{Field, Record, Subfield};
 
 use crate::Report;
 
-use crate::syntax::{in_range, Before, Body, Cond, Expr, Func, Idx, Ind, Operand, Output, Parsed, Piece, Source, Table, Target, Test, Value};
+use crate::syntax::{in_range, Before, Body, Rule, Cond, Expr, Func, Idx, Ind, Operand, Output, Parsed, Piece, Source, Table, Target, Test, Value};
 
 /// What templates and conditions can refer to.
 #[derive(Clone, Copy)]
@@ -45,6 +45,7 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record, report: Option<&RefCell<Re
                 target.fields.push(field);
             }
         }
+        Target::Linked => {}
     };
     for rule in parsed.rules.iter().filter(|rule| matches!(rule.source, Source::Record)) {
         if rule.conds.iter().all(|cond| test(cond, base)) {
@@ -52,17 +53,23 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record, report: Option<&RefCell<Re
         }
     }
     for (i, field) in record.fields.iter().enumerate() {
+        // An 880 to convert as the field it pairs with: same indicators
+        // and subfields, the tag of its $6
+        let linked = parsed.rules.iter().any(|rule| matches!(rule.target, Target::Linked) && matches_field(rule, field, record, i, base))
+            .then(|| match field {
+                Field::Standard(_, ind, subfields) => field.subfields('6').next()
+                    .and_then(|six| six.get(..3)?.parse::<u16>().ok())
+                    .map(|tag| Field::Standard(tag, *ind, subfields.clone())),
+                Field::Control(..) => None,
+            })
+            .flatten();
+        let field = linked.as_ref().unwrap_or(field);
         let ctx = Ctx { field: Some(field), ..base };
-        let same_tag = |fields: &[Field]| fields.iter().filter(|f| f.tag() == field.tag()).count();
         let mut converted = false;
         // Subfields selected by a body line, None if no data field target
         let mut taken: Option<Vec<bool>> = None;
         for rule in &parsed.rules {
-            if matches!(&rule.source, Source::Tags(pats) if pats.iter().any(|pat| pat.matches(*field.tag())))
-                && (rule.rank == (1, None)
-                    || in_range(rule.rank, same_tag(&record.fields[..=i]), same_tag(&record.fields)))
-                && rule.conds.iter().all(|cond| test(cond, ctx))
-            {
+            if !matches!(rule.target, Target::Linked) && matches_field(rule, field, record, i, ctx) {
                 produce(&rule.target, ctx, &mut target);
                 converted = true;
                 if let (Some(_), Target::Data { body, .. }, Field::Standard(_, _, subfields)) = (report, &rule.target, field) {
@@ -95,6 +102,15 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record, report: Option<&RefCell<Re
         report.borrow_mut().finish(record);
     }
     target
+}
+
+/// Whether `rule` applies to `field`, the `i`th of `record` (or the field
+/// an 880 at `i` pairs with: ranks then count among fields of its tag).
+fn matches_field(rule: &Rule, field: &Field, record: &Record, i: usize, ctx: Ctx) -> bool {
+    let same_tag = |fields: &[Field]| fields.iter().filter(|f| f.tag() == field.tag()).count();
+    matches!(&rule.source, Source::Tags(pats) if pats.iter().any(|pat| pat.matches(*field.tag())))
+        && (rule.rank == (1, None) || in_range(rule.rank, same_tag(&record.fields[..=i]), same_tag(&record.fields)))
+        && rule.conds.iter().all(|cond| test(cond, Ctx { field: Some(field), ..ctx }))
 }
 
 /// Notes that the `index`th field of the record, or its `code` subfields,
@@ -300,7 +316,9 @@ fn funcs(mut values: Vec<String>, funcs: &[Func], ctx: Ctx) -> Vec<String> {
             Func::Upper => values.into_iter().map(|v| v.to_uppercase()).collect(),
             Func::Trim => values.into_iter().map(|v| v.trim().to_string()).collect(),
             Func::Replace(regex, with) => values.into_iter().map(|v| regex.replace_all(&v, with.as_str()).into_owned()).collect(),
+            // An empty value has no key, not even `*`
             Func::Table(table, column) => values.into_iter()
+                .filter(|v| !v.is_empty())
                 .filter_map(|v| {
                     let table = &tables[*table];
                     if let Some(report) = ctx.report

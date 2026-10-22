@@ -11,8 +11,7 @@
 #
 # Coded data follow the UNIMARC Bibliographic Format Manual (IFLA,
 # online ed. 1.1.0, 2024). Not converted yet: 006, forms of musical
-# works (008/18-19; 128 uses the IAML codes), 880 alternate graphic
-# representations.
+# works (008/18-19; 128 uses the IAML codes).
 
 rules "MARC21 to UNIMARC"
 version 0.1
@@ -761,6 +760,20 @@ table note071 {
   3 = 0
 }
 
+# 880 $6 script identification (with the language for CJK, 008/35-37)
+# -> $7 alphabet/script (100/34-35 codes); Latin is not given
+table scripts {
+  "(3" = fa
+  "(B" = ""
+  "(N" = ca
+  "(S" = ga
+  "(2" = ha
+  cjk-chi = ea
+  cjk-jpn = da
+  cjk-kor = ka
+  * = zz
+}
+
 # ---- Tables for coded data by type of resource (UNIMARC Bibliographic
 # Format Manual, 1.1.0, 2024) ----------------------------------------
 
@@ -1146,10 +1159,10 @@ record -> LDR "{LDR/0-4}{LDR/5|tr(status)}{LDR/6|tr(type)}{LDR/7|tr(level)}  220
 # 20XX (MARC 21 records date from 1968). Target audience (008/22) and
 # government publication (008/28) only exist for some types; character
 # set: UTF-8 (50), script of title: Latin (ba).
-record when LDR~^.{6}([gkmor].|[at][^bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
-record when LDR~^.{6}[cdij] -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
-record when LDR~^.{6}([ef].|a[bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
-record when LDR~^.{6}p -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
+record when LDR~^.{6}([gkmor].|[at][^bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}{066|exists('g', 'y')}50      ba" }
+record when LDR~^.{6}[cdij] -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}{066|exists('g', 'y')}50      ba" }
+record when LDR~^.{6}([ef].|a[bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}{066|exists('g', 'y')}50      ba" }
+record when LDR~^.{6}p -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}{066|exists('g', 'y')}50      ba" }
 
 # 101 language: 041 with MARC codes (not those with a $2), else 008/35-37
 041 when !$2 -> 101 [{@ind1|replace(' ', '0')}#] {
@@ -1211,6 +1224,17 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
 # 007/03-13 code for code; short 007 are filled with "|"
 007 when ~^c when LDR~^.{6}m -> 135 [##] { -> $a "{008/26|replace('m', 'v')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
 007 when ~^c when !LDR~^.{6}m -> 135 [##] { -> $a "{LDR/6|tr(etype)|replace('^[^cdh]$', 'u')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
+
+# ---- Alternate graphic representations -------------------------------
+
+# An 880 is converted by the rules of the field it pairs with (its $6),
+# and both carry $6 "a" + linking number; the 880's also $7 for its
+# script. An 880 without pair (linking number 00) only carries $7.
+880 -> linked
+
+common {
+  $6 -> $6 | replace('^\d{3}-00.*$', '') | replace('^\d{3}-(\d\d).*$', 'a$1'), $7 "{}|{008/35-37}" | replace('^[^/]*$', '') | replace('^[^/]*/', '') | replace('^\$1\|(.*)$', 'cjk-$1') | replace('^(\(.).*$', '$1') | table(scripts)
+}
 
 # ---- Identifiers ----------------------------------------------------
 
