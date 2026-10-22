@@ -15,39 +15,57 @@ table roles {
   003 = dgs., Encadrant académique
   005 = act., Acteur
   010 = adp., Adaptation
+  018 = anm., Animation
+  020 = ann., Annotations
   030 = arr., Arrangement / Réduction
   040 = art., Artiste
+  060 = asn., Nom associé à l'exemplaire
   065 = auc., Commissaire-priseur
   070 = aut., Auteur
   072 = aqt., Auteur cité
   075 = aft., Postface
   080 = aui., Préface
+  090 = aud., Dialogues / commentaires
   100 = ant., Auteur adapté /précédent
   130 = bkd., Maquette
+  160 = bsl., Libraire
+  170 = cll., Calligraphie
   180 = ctg., Cartographie
   195 = cnd., Chef de choeur
   200 = chr., Chorégraphie
   205 = col., Collaborateur
+  206 = 206., 206
+  210 = cmm., Commentaires
   212 = ann., Notes
+  220 = com., Compilation
   230 = mus., Musique
   245 = ccp., Idée originale
   250 = cnd., Chef d'orchestre
   255 = csp., Consultant
+  257 = Auteur (continuateur)., Auteur (continuateur)
+  260 = Copyright., Copyright
   273 = cur., Commissaire
   280 = dte., Dédicataire
   295 = dgg., Organisme de soutenance
   300 = rsg., Réalisateur / Metteur en scène / Directeur artistique
+  310 = dst., Distributeur
   330 = dub., Auteur prétendu
   340 = edt., Éditeur scientifique
   350 = egr., Gravure
+  360 = etr., Eaux-fortes
   365 = exp., Expert
+  370 = flm., Montage
   390 = fmo., Ancien possesseur
+  395 = Fondateur., Fondateur
+  405 = Concepteur de jeu., Concepteur de jeu
   410 = art., Technicien graphique
   440 = ill., Illustrations / Graphisme
   460 = ive., Participant
   470 = ivr., Intervieweur
   475 = isb., Collectivité éditrice
   480 = lbt., Livret
+  510 = ltg., Lithographe
+  520 = lyr., Paroles
   530 = mte., Gravure
   545 = itr., Instrumentiste
   550 = nrt., Voix parlée
@@ -55,17 +73,29 @@ table roles {
   557 = orm., Organisation du congrès
   590 = prf., Exécutant
   600 = pht., Photographie
+  605 = 605., Présentateur
   610 = prt / prt-bsl., Imprimeur / Imprimeur-libraire
+  620 = mte., Gravure
   630 = pmn., Directeur de production
   632 = ard., Scénographe / Chef costumier
   633 = tcd., Accessoiriste
+  637 = pdr., Chef de projet
   650 = pbl., Éditeur commercial
   651 = pbd., Directeur de la publication
   660 = rcp., Destinataire
+  665 = 665., 665
+  670 = rce., Ingénieur du son
+  675 = rev., Critique
   690 = sce., Scénario
+  695 = sad., Conseiller scientifique
+  700 = fac., Copiste
   721 = sng., Chant
+  723 = spn., Commanditaire
   727 = ths., Directeur de thèse
   730 = trl., Traduction
+  755 = sng., Chant
+  760 = wdc., Gravure sur bois
+  770 = wam., Auteur de la notice
   956 = 956., Président du jury de soutenance
   958 = 958., 958 (Rapporteur du travail universitaire)
   981 = 981., 981 (Laboratoire associé au travail universitaire)
@@ -757,8 +787,9 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 }
 214 -> 264 [#{@ind2|table(ind264)}] {
   $a -> $a before " ;"
+  $b -> += " ({})"
   $c -> $b before " :"
-  $d -> $c before "," after $b
+  $d -> $c before ","
   end "."
 }
 # Each element ends with a period, unless it ends with ")", "]", "°" or "."
@@ -1092,17 +1123,39 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 
 # ---- Names ----------------------------------------------------------
 
-700 -> 100 [{$b|exists(1,0)}#] {
+# Dates and qualifier in parentheses: "(1913-1960 ; poète)"
+700 when $b -> 100 [1#] {
   $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
-  $a -> $a "{}{$b|replace('^(.+)$', ', $1')}"
-  $f -> $d "({}{$c|exists('; ', ')')}"
-  $c -> $c "{})"
+  # A forename ending with an initial takes a period
+  $a -> $a "{|trim}, {$b|trim|replace('(\b[A-Z])$', '$1.')}"
+  # An end date of dots has four of them ("1998-....." -> "1998-....")
+  $f -> $d "({|replace('-\.\.\.\.$', '-....#')|replace('-(\.+)\.$', '-$1')|replace('#$', '')}{$c|exists('; ', ')')}"
+  $c[1] -> $c "{$f|exists('', '(')}{}"
+  $c[2..] -> += " ; {}"
+  $c[-1] -> += ")"
   $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
   order $0 $1 $a $d $c $4 $e
   end "." skip $0 $1 $4 $e
 }
-701 -> 700 [{$b|exists(1,0)}#] like 700
-702 -> 700 [{$b|exists(1,0)}#] like 700
+# Forenames only (sovereigns, saints...): qualifier before dates,
+# "(reine de France ; 1601-1666)"
+701 702 when !$b -> 700 [0#] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a
+  $d -> $b
+  $c[1] -> $c "({}"
+  $c[2..] -> += " ; {}"
+  $c[-1] -> += "{$f|exists(' ; ', ')')}"
+  $f -> $d "{$c|exists('', '(')}{|replace('-\.\.\.\.$', '-....#')|replace('-(\.+)\.$', '-$1')|replace('#$', '')})"
+  $4 -> $4 {|table(roles, 1)}, $e {|table(roles, 2)} before "." after $e
+  order $0 $1 $a $b $c $d $4 $e
+  end "." skip $0 $1 $4 $e
+}
+700 when !$b -> 100 [0#] like 701
+701 702 when $b -> 700 [1#] like 700
+# Families
+720 -> 100 [3#] like 701
+721 722 -> 700 [3#] like 701
 710 -> 110 [2#] {
   $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
   $a -> $a
