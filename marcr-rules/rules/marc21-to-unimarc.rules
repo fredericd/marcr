@@ -10,8 +10,8 @@
 #   replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
 #
 # Coded data follow the UNIMARC Bibliographic Format Manual (IFLA,
-# online ed. 1.1.0, 2024). Not converted yet: 006, microforms (007/00
-# h), forms of musical works (008/18-19), 880 alternate graphic
+# online ed. 1.1.0, 2024). Not converted yet: 006, forms of musical
+# works (008/18-19; 128 uses the IAML codes), 880 alternate graphic
 # representations.
 
 rules "MARC21 to UNIMARC"
@@ -1093,6 +1093,36 @@ table accompanying126 {
   n = " "
 }
 
+# 007 (microforms) -> 130 $a: material (01), polarity (03), colour (09),
+# emulsion (10), generation (11), base of film (12); dimensions (04),
+# reduction ratio (05-08) keep their codes
+table smd130 {
+  j = d
+}
+table polarity130 {
+  m = d
+}
+table colour130 {
+  b = a
+  c = b
+  m = v
+}
+table emulsion130 {
+  m = v
+  n = x
+}
+table generation130 {
+  m = v
+}
+table base130 {
+  i = b
+  m = f
+  n = x
+  p = e
+  r = f
+  t = g
+}
+
 # Leader/06 -> 135/0 type of electronic resource, when the record is
 # not for a computer file (computer files: 008/26)
 table etype {
@@ -1173,6 +1203,9 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
 
 # Sound recordings (007/00 s). shortcut: $b (pre-LRM) is not produced.
 007 when ~^s -> 126 [##] { -> $a "{/1|tr(release126)}{/3|tr(speed126)}{/4|tr(sound126)}{/5|tr(groove126)}{/6|tr(size126)}{/7|tr(tapewidth126)}{/8|tr(tapeconfig126)}{008/24-29|tr(accompanying126)|default('||||||')}{/13|tr(technique126)|default('|')}{/12|tr(special126)|default('|')}" }
+
+# Microforms (007/00 h)
+007 when ~^h -> 130 [##] { -> $a "{/1|tr(smd130)}{/3|tr(polarity130)}{/4-5}{/6-8|replace('^---$', '   ')|replace('-', 'u')}{/9|tr(colour130)}{/10|tr(emulsion130)}{/11|tr(generation130)}{/12|tr(base130)}|||||||||||" | replace('^(.{11}).*$', '$1') }
 
 # Electronic resources (007/00 c): positions 1-12 follow 007/01 and
 # 007/03-13 code for code; short 007 are filled with "|"
@@ -1619,7 +1652,7 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
   $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $2 -> $2
-  order $a $b $c $d $f $g $j $x $y $z $2
+  order $a $b $c $d $f $g $* $2
 }
 600 when @ind1=3 when !$t -> 602 [##] like 600
 
@@ -1635,7 +1668,7 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
   $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $2 -> $2
-  order $a $b $d $e $f $j $x $y $z $2
+  order $a $b $d $e $f $* $2
 }
 611 when !$t -> 601 [1{@ind1}] like 610
 
@@ -1651,11 +1684,11 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
   $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $2 -> $2
-  order $a $h $i $k $m $j $x $y $z $2
+  order $a $h $i $k $m $* $2
 }
 
 # Topical (606, indicator 1: level of the subject), geographic (607),
-# form or genre (608)
+# form or genre (608). Subdivisions keep the order of the heading.
 650 -> 606 [{@ind1}#] {
   -> $2 "{@ind2|table(subjectsource)}"
   $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
@@ -1664,7 +1697,7 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
   $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
   $2 -> $2
-  order $a $j $x $y $z $2
+  order $* $2
 }
 651 -> 607 [##] like 650
 655 -> 608 [##] like 650

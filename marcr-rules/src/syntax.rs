@@ -580,14 +580,14 @@ impl<'a> Parser<'a> {
                 return self.error("unterminated block, expected `}`");
             }
             if self.keyword("order") {
-                body.order = self.codes()?;
+                body.order = self.codes(true)?;
                 continue;
             }
             if self.keyword("end") {
                 self.skip_spaces();
                 let punct = self.string()?;
                 self.skip_spaces();
-                let skip = if self.keyword("skip") { self.codes()? } else { Vec::new() };
+                let skip = if self.keyword("skip") { self.codes(false)? } else { Vec::new() };
                 body.end = Some((punct, skip));
                 continue;
             }
@@ -618,11 +618,14 @@ impl<'a> Parser<'a> {
     }
 
     /// `$a $b ...` (at least one).
-    fn codes(&mut self) -> Result<Vec<char>> {
+    /// `$a $b ...`; with `star`, `$*` stands for the codes not listed,
+    /// as `'*'`.
+    fn codes(&mut self, star: bool) -> Result<Vec<char>> {
         let mut codes = Vec::new();
         while { self.skip_spaces(); self.eat("$") } {
             match self.code()? {
                 Some(code) => codes.push(code),
+                None if star => codes.push('*'),
                 None => return self.error("`$*` is not allowed here"),
             }
         }

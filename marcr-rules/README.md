@@ -144,7 +144,8 @@ Outputs, separated by commas:
 Block statements:
 
 - `order $a $b ...`: target subfields are sorted in this order (repeated
-  codes keep theirs; codes not listed go last), before punctuation.
+  codes keep theirs; codes not listed go last, or where `$*` is:
+  `order $a $* $2`), before punctuation.
 - `end "P" [skip $x ...]`: `P` is appended to the last subfield not
   skipped, unless it already ends with `P`.
 

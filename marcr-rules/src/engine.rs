@@ -163,9 +163,11 @@ fn data_field(tag: u16, inds: Option<&[Ind; 2]>, body: &Body, ctx: Ctx) -> Optio
         return None;
     }
     if !body.order.is_empty() {
-        // Stable: repeated codes keep their order; unlisted codes go last
+        // Stable: repeated codes keep their order; unlisted codes go
+        // where `$*` is, else last
         let order = &body.order;
-        subfields.sort_by_key(|(Subfield(code, _), _)| order.iter().position(|c| c == code).unwrap_or(order.len()));
+        let rest = order.iter().position(|c| *c == '*').unwrap_or(order.len());
+        subfields.sort_by_key(|(Subfield(code, _), _)| order.iter().position(|c| c == code).unwrap_or(rest));
     }
     for i in 1..subfields.len() {
         let previous = subfields[i - 1].0.0;

@@ -236,6 +236,13 @@ fn errors_give_the_line() {
 }
 
 #[test]
+fn order_with_the_other_codes_in_place() {
+    let rules = rules("650 -> 606 { -> $2 'lcsh' ; $* -> $* ; order $a $* $2 }");
+    let source = record(vec![vec!["650", " 0", "a", "Insects", "z", "Egypt", "v", "Periodicals"]]);
+    assert_eq!(lines(&rules.apply(&source)), ["606 #0 $aInsects $zEgypt $vPeriodicals $2lcsh"]);
+}
+
+#[test]
 fn conditions_on_the_source_value() {
     let rules = rules("007 when ~^s -> 126 [##] { -> $a '{/1}' }\n007 when !~^s -> 135 [##] { -> $a '{/1}' }");
     let source = record(vec![vec!["007", "sd fsngnnmmned"], vec!["007", "cr |||||||||||"]]);
