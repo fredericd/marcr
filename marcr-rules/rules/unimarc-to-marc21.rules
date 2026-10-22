@@ -633,6 +633,13 @@ table ind034 {
   4 = 0
 }
 
+# 321 indicator 1 -> 510 indicator 1 (coverage)
+table ind510 {
+  " " = 0
+  0 = 1
+  1 = 4
+}
+
 # ---- Leader and control fields --------------------------------------
 
 record -> LDR "{LDR/0-4}{LDR/5}{LDR/6|table(type)}{LDR/7} a2200000 i 4500"
@@ -675,6 +682,13 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $z -> $z | replace('-', '')
 }
 035 -> 035 [##] { $a -> $a ; $z -> $z }
+# National bibliography numbers; a Library of Congress number goes to 010
+# (Abes truncates it to 9 digits after 3 blanks: not kept)
+020 when !$a=US -> 015 [##] { $b -> $a "{$a}{}" }
+020 when $a=US -> 010 [##] { $b -> $a "  {}" }
+021 -> 017 [##] { $b -> $a ; $a -> $b ; order $a $b }
+102 when $a[2] -> 044 [##] { $a -> $a {|table(country)|trim} }
+660 -> 043 [##] { $a -> $a }
 123 -> 034 [{@ind1|table(ind034)}#] { $a -> $a ; $b -> $b ; $c -> $c ; $d -> $d ; $e -> $e ; $f -> $f ; $g -> $g }
 # Abes copies 128 as is to 047, blanks as "#": here the form of composition
 # goes to 047, the instruments and voices to 048
@@ -720,7 +734,9 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 }
 # A final period, unless the statement ends with "]" or "."
 205 -> 250 [##] { $a -> $a | replace('([^\].])$', '$1.') }
+127 -> 306 [##] { $a -> $a }
 207 -> 362 [##] { $a -> $a }
+208 -> 254 [##] { $a -> $a ; end "." }
 230 -> 256 [##] { $a -> $a ; end "." }
 # Publication (210, older records) -> 260; manufacture in parentheses
 # A final period, unless the date ends with "]", ")", "?", "-" or ".".
@@ -770,6 +786,20 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 # "?" or "!"
 300 301 302 304 305 306 307 308 312 333 -> 500 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
 315 -> 507 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+303 -> 501 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+321 -> 510 [{@ind1|table(ind510)}#] { $a -> $a ; $b -> $b ; $c -> $c }
+322 -> 508 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+323 -> 511 [1#] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+325 when $a -> 533 [##] { $a -> $a | trim ; $u -> += " ({})" ; end "." }
+325 when !$a -> 533 [##] {
+  $b -> $a "{}{$u|replace('^(.+)$', ' ($1)')}"
+  $c -> $b before "."
+  $d -> $c before ":"
+  $e -> $d "{}." before ","
+}
+334 -> 586 [##] { $a -> $a ; $b -> $a ; $c -> += ", {}" }
+336 -> 516 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+317 -> 561 [##] { $a -> $a }
 320 -> 504 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
 327 -> 505 [{@ind1|table(ind505)}#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
 328 -> 502 [##] { $b -> $a ; $c -> += " : {}" ; $e -> += " : {}" ; $d -> += " : {}" }
@@ -916,6 +946,12 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $d[1] -> $d "{$j}-{|replace('^(..)(..)$', '$1-$2')}"
   order $a $d $g
 }
+540 -> 740 [{$a|nonfiling}#] {
+  $a -> $a | strip_nsb
+  $e -> += " : {}"
+  $h -> $n
+  $i -> $p before "."
+}
 517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b before " :" }
 518 532 -> 246 [13] like 517
 512 -> 246 [14] like 517
@@ -939,6 +975,33 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 }
 
 # ---- Subjects -------------------------------------------------------
+
+# Name/title: indicator 1 is 1 for a surname (with a comma)
+604 when $2=rameau -> 600 [{$a|replace('^[^,]*$', '0')|replace('^.*,.*$', '1')}7] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a
+  $t -> $t before "."
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $0 $1 $2
+}
+605 when $2=rameau -> 630 [{$a|nonfiling}7] {
+  $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
+  $a -> $a | strip_nsb
+  $i -> $p
+  $n -> $g
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2 "ram"
+  end "." skip $0 $1 $2
+}
+605 when $2=lc -> 630 [{$a|nonfiling}0] {
+  $a -> $a | strip_nsb
+  $i -> $p
+  $n -> $g
+  $x -> $x ; $y -> $z ; $z -> $y ; $j -> $v
+  $2 -> $2
+  end "." skip $2
+}
 
 606 when $2=rameau -> 650 [#7] {
   $3 -> $0 "(IdRef){}", $1 "http://www.idref.fr/{}/id"
@@ -1021,6 +1084,7 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 
 # ---- Classifications ------------------------------------------------
 
+675 -> 080 [##] { $a -> $a ; $v -> $2 }
 676 -> 082 [0#] { $a -> $a ; $v -> $2 }
 680 -> 050 [#4] { $a -> $a ; $b -> $b }
 686 when $2=usnlm -> 060 [#4] { $a -> $a }
