@@ -10,8 +10,9 @@
 #   replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
 #
 # Coded data follow the UNIMARC Bibliographic Format Manual (IFLA,
-# online ed. 1.1.0, 2024). Not converted yet: 006, forms of musical
-# works (008/18-19; 128 uses the IAML codes).
+# online ed. 1.1.0, 2024). Not converted: 006 (but for 135/0), RDA
+# fields without a UNIMARC equivalent (340, 344, 648), medium of
+# performance (382: 146 needs IAML codes, not terms).
 
 rules "MARC21 to UNIMARC"
 version 0.1
@@ -1214,6 +1215,12 @@ record when LDR~^.{6}[ef] -> 120 [##] { -> $a "{007/0-3|replace('^a..(.)$', '$1'
 record when LDR~^.{6}[cd] -> 125 [##] { -> $a "{008/20|tr(score125)}{008/21|replace(' ', 'y')|tr(parts125)}" }
 record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('^ +$', '')}" }
 
+# Form of musical work: the IAML codes (128) extend the MARC 21 ones
+# (008/18-19, 047) with a third character, often blank. Multiple forms
+# (mu) are in 047; not applicable, unknown and other are not coded.
+record when LDR~^.{6}[cdij] -> 128 [##] { -> $a "{008/18-19|replace('^(mu|nn|uu|zz|\|\|)$', '')|replace('^(..)$', '$1 ')}" }
+047 -> 128 [##] { $a -> $a | replace('^(..)$', '$1 ') }
+
 # Sound recordings (007/00 s). shortcut: $b (pre-LRM) is not produced.
 007 when ~^s -> 126 [##] { -> $a "{/1|tr(release126)}{/3|tr(speed126)}{/4|tr(sound126)}{/5|tr(groove126)}{/6|tr(size126)}{/7|tr(tapewidth126)}{/8|tr(tapeconfig126)}{008/24-29|tr(accompanying126)|default('||||||')}{/13|tr(technique126)|default('|')}{/12|tr(special126)|default('|')}" }
 
@@ -1221,9 +1228,11 @@ record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('
 007 when ~^h -> 130 [##] { -> $a "{/1|tr(smd130)}{/3|tr(polarity130)}{/4-5}{/6-8|replace('^---$', '   ')|replace('-', 'u')}{/9|tr(colour130)}{/10|tr(emulsion130)}{/11|tr(generation130)}{/12|tr(base130)}|||||||||||" | replace('^(.{11}).*$', '$1') }
 
 # Electronic resources (007/00 c): positions 1-12 follow 007/01 and
-# 007/03-13 code for code; short 007 are filled with "|"
+# 007/03-13 code for code; short 007 are filled with "|". The type is in
+# 008/26 for computer files, else in a computer file 006 (006/09).
 007 when ~^c when LDR~^.{6}m -> 135 [##] { -> $a "{008/26|replace('m', 'v')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
-007 when ~^c when !LDR~^.{6}m -> 135 [##] { -> $a "{LDR/6|tr(etype)|replace('^[^cdh]$', 'u')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
+007 when ~^c when !LDR~^.{6}m when 006~^m -> 135 [##] { -> $a "{006/9|replace('m', 'v')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
+007 when ~^c when !LDR~^.{6}m when !006~^m -> 135 [##] { -> $a "{LDR/6|tr(etype)|replace('^[^cdh]$', 'u')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
 
 # ---- Alternate graphic representations -------------------------------
 
@@ -1326,6 +1335,23 @@ common {
 # Geographic area codes. shortcut: repeated $a stay in one 660, which
 # UNIMARC does not repeat; one field per code needs a field per subfield.
 043 -> 660 [##] { $a -> $a }
+
+# Time period of content: MARC 21 codes (045 $a) are those of 661;
+# formatted dates (045 $b) those of 122. shortcut: repeated $a stay in
+# one 661, as for 660.
+045 when $a -> 661 [##] { $a -> $a }
+045 when $b -> 122 [{@ind1}#] { $b -> $a }
+
+# Digital file characteristics
+347 -> 231 [##] {
+  $a -> $a
+  $b -> $b
+  $c -> $e
+  $d -> $f
+  $e -> $g
+  $f -> $h
+  $2 -> $2
+}
 
 # ---- Classification -------------------------------------------------
 
