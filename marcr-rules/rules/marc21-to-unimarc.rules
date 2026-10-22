@@ -684,12 +684,12 @@ table relators {
 
 # Subject heading indicator 2 -> $2 (4 and 7: no code, or the field's $2)
 table subjectsource {
-  0 = lcsh
-  1 = lcshac
+  0 = lc
+  1 = lcch
   2 = mesh
   3 = nal
   4 = ""
-  5 = cash
+  5 = cae
   6 = rvm
   7 = ""
 }
