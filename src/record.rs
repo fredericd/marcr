@@ -5,7 +5,7 @@ use crate::DEFAULT_LEADER;
 
 /// A subfield of a "standard" MARC field (tag ≥ 10): a one-character
 /// code (`$a`, `$b`, ...) and its value.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subfield(pub char, pub String);
 
 impl fmt::Display for Subfield {
@@ -18,7 +18,7 @@ impl fmt::Display for Subfield {
 /// A field of a MARC record: either a control field (tag < 10, a plain
 /// text value), or a standard field (tag ≥ 10, two indicators and a list
 /// of subfields).
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Field {
     /// Control field (tags 001-009): tag and value.
     Control(u16, String),
@@ -101,7 +101,7 @@ impl fmt::Display for Field {
 }
 
 /// A MARC bibliographic record: a 24-byte leader and a list of fields.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// The 24 leader bytes (record length, status, document type,
     /// directory position/size, etc.).
