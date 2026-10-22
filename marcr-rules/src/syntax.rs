@@ -803,7 +803,8 @@ impl<'a> Parser<'a> {
 
     fn operand(&mut self) -> Result<Operand> {
         match self.peek() {
-            None | Some('|' | '/' | '}') => Ok(Operand::Current),
+            // `when ~^s`: the source value, as `{}` in a template
+            None | Some('|' | '/' | '}' | '=' | '~') => Ok(Operand::Current),
             Some('$') => {
                 self.pos += 1;
                 match self.code()? {

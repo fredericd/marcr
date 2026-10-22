@@ -195,8 +195,9 @@ record when !856 -> ...
 ```
 
 `when [!]OPERAND[=VALUE|~REGEX]`: the operand is a subfield of the source
-field (`$2`), an indicator (`@ind2`) or a record path (`700a`); without
-a rank, any occurrence matches. Without a test, the operand must have a
+field (`$2`), an indicator (`@ind2`), a record path (`700a`) or nothing,
+for the value of a source control field (`007 when ~^s`); without a
+rank, any occurrence matches. Without a test, the operand must have a
 value. `!` negates. Several `when` must all hold.
 
 ## Corpus

@@ -9,9 +9,10 @@
 # "p.", "J."). That chain is written out in each rule:
 #   replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
 #
-# Not converted yet: coded data of maps, music, sound recordings,
-# visual materials and electronic resources (MARC 006, 007, 008/18-34
-# outside books and serials), 880 alternate graphic representations.
+# Coded data follow the UNIMARC Bibliographic Format Manual (IFLA,
+# online ed. 1.1.0, 2024). Not converted yet: 006, microforms (007/00
+# h), forms of musical works (008/18-19), 880 alternate graphic
+# representations.
 
 rules "MARC21 to UNIMARC"
 version 0.1
@@ -760,6 +761,353 @@ table note071 {
   3 = 0
 }
 
+# ---- Tables for coded data by type of resource (UNIMARC Bibliographic
+# Format Manual, 1.1.0, 2024) ----------------------------------------
+
+# 007/03 colour (motion pictures, videos, projected graphics) -> 115/4
+table colour115 {
+  a = d
+  b = a
+  c = b
+  h = z
+  m = c
+  n = " "
+}
+
+# 007/01 (motion pictures) -> 115/8 form of release
+table release115m {
+  c = b
+  f = c
+  o = d
+  r = a
+}
+
+# 007/01 (projected graphics) -> 115/8 form of release
+table release115g {
+  c = g
+  d = h
+  f = i
+  o = j
+  s = k
+  t = l
+}
+
+# 007/01 (videos) -> 115/15 form of release
+table release115v {
+  c = a
+  d = b
+  f = c
+  r = d
+  u = "|"
+}
+
+# 007/04 (motion pictures) -> 115/10 presentation format
+table format115m {
+  e = f
+  f = e
+}
+
+# 007/04 (videos) -> 115/16 presentation format: Beta, VHS, U-matic,
+# EIAJ, Type C, Quadruplex, Laser optical, CED as such; Betacam, Super
+# VHS, M-II, D-2, Hi-8: other
+table format115v {
+  i = z
+  j = z
+  k = z
+  m = z
+  o = z
+  p = j
+  q = z
+  s = l
+  v = k
+}
+
+# 007/07 dimensions -> 115/7: motion pictures keep their codes;
+# videos (1/4, 1/2, 3/4 in.) and projected graphics by size
+table width115v {
+  m = z
+  o = z
+  r = z
+  u = "|"
+}
+table width115g {
+  j = l
+  v = r
+  y = u
+  u = "|"
+}
+table width115m {
+  u = "|"
+}
+
+# 007/04 (projected graphics) -> 115/17 base of emulsion
+table emulsion115 {
+  d = z
+  e = c
+  j = a
+  k = b
+  m = v
+  o = z
+}
+
+# 008/34 (visual materials) -> 115/9 technique
+table technique115 {
+  l = b
+  n = x
+}
+
+# 007/01 (nonprojected graphics) -> 116/0 specific material designation
+table smd116 {
+  a = z
+  c = a
+  d = b
+  e = c
+  f = d
+  g = e
+  h = f
+  i = h
+  j = i
+  k = z
+  l = k
+  n = z
+  o = z
+  p = z
+  q = z
+  r = z
+  s = z
+  u = "|"
+  v = f
+}
+
+# 007/04-05 (nonprojected graphics) -> 116/1-2 support material
+table support116 {
+  i = e
+  l = e
+  m = v
+  n = f
+  o = i
+  p = j
+  q = k
+  r = l
+  s = m
+  t = n
+  v = f
+  w = f
+  " " = y
+}
+
+# 007/03 (nonprojected graphics) -> 116/3 colour
+table colour116 {
+  h = d
+  m = v
+}
+
+# 007/03 (maps) -> 120/0 colour
+table colour120 {
+  c = b
+}
+
+# 008/31 (maps) index -> 120/1
+table index120 {
+  0 = y
+  1 = a
+}
+
+# 008/25 (maps) type of cartographic material -> 121/8 form of publication
+table form121 {
+  c = b
+  d = z
+  e = c
+  f = d
+  g = e
+  u = "|"
+  " " = "|"
+}
+
+# 007/04 (maps) physical medium -> 121/3-4
+table medium121 {
+  a = aa
+  b = ab
+  c = ac
+  d = ad
+  e = ae
+  f = af
+  g = ag
+  i = ae
+  j = az
+  l = ae
+  n = af
+  p = ap
+  q = ba
+  r = bb
+  s = bc
+  t = bd
+  u = au
+  v = af
+  w = af
+  x = "||"
+  y = bz
+  z = az
+  "|" = "||"
+}
+
+# 007/06 (maps) production details -> 121/5 creation technique
+table technique121 {
+  a = c
+  b = c
+  c = z
+  d = z
+}
+
+# 007/05 (maps) type of reproduction -> 121/6
+table reproduction121 {
+  f = "|"
+  n = y
+  u = "|"
+  z = "|"
+}
+
+# 007/01 (maps, globes) -> 124 $b form of cartographic resource
+table form124 {
+  a = c
+  b = c
+  c = c
+  d = a
+  e = c
+  g = b
+  j = d
+  k = f
+  q = e
+  r = g
+  s = h
+  y = i
+  u = ""
+}
+
+# 008/20 (music) format of music -> 125 $a/0
+table score125 {
+  h = d
+  i = e
+  j = z
+  k = c
+  l = a
+  n = x
+  p = z
+}
+
+# 008/21 (music) parts -> 125 $a/1 (blank already turned to y)
+table parts125 {
+  d = a
+  e = b
+  f = c
+  n = x
+}
+
+# 008/30-31 (sound recordings) literary text -> 125 $b
+table literary125 {
+  a = h
+  b = i
+  c = q
+  d = b
+  e = j
+  f = c
+  g = k
+  h = d
+  i = f
+  j = p
+  k = r
+  l = e
+  m = l
+  n = " "
+  o = s
+  p = a
+  r = m
+  s = g
+  t = n
+}
+
+# 007 (sound recordings) -> 126 $a: form of release (01), speed (03),
+# kind of sound (04), groove (05), dimensions (06), tape width (07),
+# tape configuration (08), recording technique (13), special
+# reproduction characteristics (12)
+table release126 {
+  d = a
+  e = f
+  g = d
+  i = h
+  q = g
+  r = z
+  s = c
+  t = b
+  u = "|"
+  w = e
+}
+table speed126 {
+  f = g
+  k = l
+  l = k
+  n = x
+  o = n
+  p = o
+  r = p
+  s = z
+}
+table sound126 {
+  m = a
+  q = c
+  s = b
+}
+table groove126 {
+  m = b
+  n = x
+  s = a
+}
+table size126 {
+  g = h
+  n = x
+}
+table tapewidth126 {
+  l = d
+  m = z
+  n = x
+  o = z
+  p = c
+}
+table tapeconfig126 {
+  n = x
+}
+table technique126 {
+  d = c
+  e = d
+}
+table special126 {
+  c = f
+  d = c
+  e = d
+  f = e
+  n = x
+}
+
+# 008/24-29 (music) accompanying matter -> 126 $a/7-12
+table accompanying126 {
+  n = " "
+}
+
+# Leader/06 -> 135/0 type of electronic resource, when the record is
+# not for a computer file (computer files: 008/26)
+table etype {
+  a = d
+  c = d
+  d = d
+  e = c
+  f = c
+  g = c
+  i = h
+  j = h
+  k = c
+  t = d
+}
+
 # ---- Leader and coded data ------------------------------------------
 
 record -> LDR "{LDR/0-4}{LDR/5|tr(status)}{LDR/6|tr(type)}{LDR/7|tr(level)}  2200000{LDR/17|tr(encoding)}{LDR/18|replace('^ $', 'n')|replace('^[aci]$', ' ')|replace('^u$', 'i')} 450 "
@@ -792,13 +1140,44 @@ record -> 102 [##] { -> $a "{008/15-17|trim|table(country)}" }
 # 105 textual material (books)
 record when LDR~^.{6}[at][^bis] -> 105 [##] { -> $a "{008/18-21|tr(illustrations)|replace('^    $', 'y   ')}{008/24-27|tr(contents)}{008/29}{008/30}{008/31}{008/33|tr(literature)}{008/34|replace(' ', 'y')}" }
 
-# 106 form of item (textual material, printed music)
-record when LDR~^.{6}[acdpt] -> 106 [##] { -> $a "{008/23|replace(' ', 'r')|tr(itemform)}" }
+# 106 form of item (textual material, printed music); electronic and
+# microform are obsolete codes there, given by 182 instead
+record when LDR~^.{6}[acdpt] -> 106 [##] { -> $a "{008/23|replace(' ', 'r')|tr(itemform)|replace('^[st]$', '')}" }
 
 # 110 continuing resources: type, frequency, regularity, nature of the
 # entire work and of contents, conference; title page and index
 # availability are not in MARC 21
 record when LDR~^.{6}a[is] -> 110 [##] { -> $a "{008/21|tr(serialtype)}{008/18|replace(' ', 'y')|tr(frequency)}{008/19|tr(regularity)}{008/24-27|tr(serialcontents)}{008/29}|||" }
+
+# Visual projections, video recordings, motion pictures (007/00 m, v,
+# g). shortcut: $b (film archives) is not produced.
+007 when ~^m -> 115 [##] { -> $a "a{008/18-20|replace('[-n|]', ' ')}{/3|tr(colour115)}{/5|replace(' ', 'y')}{/6|replace(' ', 'x')}{/7|tr(width115m)}{/1|tr(release115m)}{008/34|tr(technique115)}{/4|tr(format115m)}||||x|xx|" }
+007 when ~^v -> 115 [##] { -> $a "c{008/18-20|replace('[-n|]', ' ')}{/3|tr(colour115)}{/5|replace(' ', 'y')}{/6|replace(' ', 'x')}{/7|tr(width115v)}x{008/34|tr(technique115)}x||||{/1|tr(release115v)}{/4|tr(format115v)}xx|" }
+007 when ~^g -> 115 [##] { -> $a "b{008/18-20|replace('[-n|]', ' ')}{/3|tr(colour115)}{/5|replace(' ', 'y')}{/6|replace(' ', 'x')}{/7|tr(width115g)}{/1|tr(release115g)}xx||||xx{/4|tr(emulsion115)}|#" | replace('#$', ' ') }
+
+# Graphics (007/00 k): techniques and function are not in MARC 21
+007 when ~^k -> 116 [##] { -> $a "{/1|tr(smd116)}{/4|tr(support116)}{/5|tr(support116)|default('y')}{/3|tr(colour116)}||||||||||||||" }
+
+# Cartographic resources: 120 from 008 (and the first 007 if it is a
+# map's), 121 and 124 from each map 007
+record when LDR~^.{6}[ef] -> 120 [##] { -> $a "{007/0-3|replace('^a..(.)$', '$1')|replace('^.{2,}$', '|')|tr(colour120)|default('|')}{008/31|tr(index120)}|{008/18-21|replace('^    $', 'x   ')}{008/22-23|replace('^  $', 'uu')}||||" }
+007 when ~^a -> 121 [##] { -> $a "a||{/4|tr(medium121)}{/6|tr(technique121)}{/5|tr(reproduction121)}|{008/25|tr(form121)}" }
+007 when ~^d -> 121 [##] { -> $a "b||{/4|tr(medium121)}{/6|tr(technique121)}{/5|tr(reproduction121)}|z" }
+007 when ~^a -> 124 [##] { -> $b "{/1|tr(form124)}" }
+007 when ~^d -> 124 [##] { -> $b "c" }
+
+# Music: format of notated music and parts (scores), literary text
+# (spoken recordings)
+record when LDR~^.{6}[cd] -> 125 [##] { -> $a "{008/20|tr(score125)}{008/21|replace(' ', 'y')|tr(parts125)}" }
+record when LDR~^.{6}i -> 125 [##] { -> $b "{008/30-31|tr(literary125)|replace('^ +$', '')}" }
+
+# Sound recordings (007/00 s). shortcut: $b (pre-LRM) is not produced.
+007 when ~^s -> 126 [##] { -> $a "{/1|tr(release126)}{/3|tr(speed126)}{/4|tr(sound126)}{/5|tr(groove126)}{/6|tr(size126)}{/7|tr(tapewidth126)}{/8|tr(tapeconfig126)}{008/24-29|tr(accompanying126)|default('||||||')}{/13|tr(technique126)|default('|')}{/12|tr(special126)|default('|')}" }
+
+# Electronic resources (007/00 c): positions 1-12 follow 007/01 and
+# 007/03-13 code for code; short 007 are filled with "|"
+007 when ~^c when LDR~^.{6}m -> 135 [##] { -> $a "{008/26|replace('m', 'v')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
+007 when ~^c when !LDR~^.{6}m -> 135 [##] { -> $a "{LDR/6|tr(etype)|replace('^[^cdh]$', 'u')}{/1}{/3-13}||||||||||||" | replace('^(.{13}).*$', '$1') }
 
 # ---- Identifiers ----------------------------------------------------
 

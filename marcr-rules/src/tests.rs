@@ -236,6 +236,13 @@ fn errors_give_the_line() {
 }
 
 #[test]
+fn conditions_on_the_source_value() {
+    let rules = rules("007 when ~^s -> 126 [##] { -> $a '{/1}' }\n007 when !~^s -> 135 [##] { -> $a '{/1}' }");
+    let source = record(vec![vec!["007", "sd fsngnnmmned"], vec!["007", "cr |||||||||||"]]);
+    assert_eq!(lines(&rules.apply(&source)), ["126 ## $ad", "135 ## $ar"]);
+}
+
+#[test]
 fn unicode_escapes() {
     let rules = rules(r#"245 -> 200 { $a -> $a "{@ind2}{}" | replace('^4(.{4})', '\u{98}$1\u{9c}') | replace('^0', '') }"#);
     let source = record(vec![vec!["245", "14", "a", "The title"], vec!["245", "10", "a", "Title"]]);
