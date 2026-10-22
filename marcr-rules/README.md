@@ -3,7 +3,8 @@
 A rule language to convert MARC records from one format to another,
 built on [marcr](https://crates.io/crates/marcr). It comes with rules
 converting UNIMARC to MARC21, written after the conversion of the French
-union catalogue Sudoc (Abes).
+union catalogue Sudoc (Abes), and MARC21 to UNIMARC, written after the
+two formats and checked on records of the Library of Congress.
 
 A rules file is self-contained: header, tables and rules in a single
 text file, easy to share, read and compare between versions.
@@ -16,6 +17,7 @@ marcr-rules convert -r unimarc-to-marc21 -s marcxml notices.mrc > notices.xml
 marcr-rules show unimarc-to-marc21 > my.rules           # start your own rules
 marcr-rules convert -r my.rules -s iso2709 -o out.mrc notices.mrc
 marcr-rules eval -r my.rules corpus/unimarc.mrc corpus/marc21.mrc --show 245,300
+marcr-rules coverage -r my.rules corpus/unimarc.mrc       # what the rules leave out
 ```
 
 `-r` takes a rules file, or the name of built-in rules. `convert` takes
@@ -24,6 +26,10 @@ cores. `eval` converts each record of the first file and compares it, tag
 by tag, with the record of the second file that has the same 001; `--show`
 prints the differences for some tags. With `--pairs FILE`, records are
 paired by the lines `SOURCE_001 EXPECTED_001` of FILE instead.
+`coverage` needs no expected records: it counts, in records, the fields
+that no rule converts, the subfields that no body line selects, and the
+keys missing from tables (unless the table has a `*` entry). A field or subfield read by an expression
+(`{100a/9-12}`, `{$b}`) is not left out.
 
 ## Library usage
 
@@ -36,6 +42,7 @@ let marc21 = rules.apply(&unimarc_record);
 
 `Rules::apply` takes a record and returns a new one: use it as the
 `process` closure of `marcr::parallel::convert` to convert on all cores.
+`Rules::apply_with_report` also returns what the rules leave out.
 
 ## The language
 
@@ -144,8 +151,8 @@ Block statements:
 ### Values and templates
 
 A value is a template string, `"..."` or `'...'` (`\\`, `\"`, `\'`,
-`\n` and `\t` are escapes, other backslashes are kept, as in regexes:
-`'\.$'`), where `{expression}`
+`\n`, `\t` and `\u{98}`, a character by its code point, are escapes;
+other backslashes are kept, as in regexes: `'\.$'`), where `{expression}`
 is replaced by its result (`{{` and `}}` for literal braces), or a single
 `{expression}`. Functions after the value apply to the whole result:
 `$a -> $a | replace('-', '')`. Texts are compared and produced as they

@@ -234,3 +234,36 @@ fn errors_give_the_line() {
     assert!(error("200 -> 245 { $a -> $a ; order }").contains("expected subfield codes"));
     assert!(error("701 -> 700 like 700").contains("no previous rule"));
 }
+
+#[test]
+fn unicode_escapes() {
+    let rules = rules(r#"245 -> 200 { $a -> $a "{@ind2}{}" | replace('^4(.{4})', '\u{98}$1\u{9c}') | replace('^0', '') }"#);
+    let source = record(vec![vec!["245", "14", "a", "The title"], vec!["245", "10", "a", "Title"]]);
+    assert_eq!(lines(&rules.apply(&source)), ["200 14 $a\u{98}The \u{9c}title", "200 10 $aTitle"]);
+    assert!(error("200 -> 245 { $a -> $a '\\u{zz}' }").contains("invalid escape"));
+}
+
+#[test]
+fn report_lists_what_is_left_out() {
+    let rules = rules(
+        r#"table langs {
+          fre = French
+        }
+        record -> 008 "{100a/9-12}"
+        101 -> 041 { $a -> $a {|table(langs)} }
+        200 -> 245 { $a -> $a "{}{$e}" }
+        "#,
+    );
+    let source = record(vec![
+        vec!["100", "  ", "a", "20240101d2024"],
+        vec!["101", "0 ", "a", "fre", "a", "xxx", "c", "ger"],
+        vec!["200", "1 ", "a", "Titre", "e", "sous-titre", "f", "Auteur"],
+        vec!["330", "  ", "a", "Résumé"],
+    ]);
+    let (converted, report) = rules.apply_with_report(&source);
+    assert_eq!(lines(&converted), lines(&rules.apply(&source)));
+    // 100 is read by an expression, 200$e by a template
+    assert_eq!(report.unconverted_fields, [330]);
+    assert_eq!(report.unconverted_subfields, [(101, 'c'), (200, 'f')]);
+    assert_eq!(report.table_misses, [(String::from("langs"), String::from("xxx"))]);
+}

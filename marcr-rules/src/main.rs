@@ -83,6 +83,20 @@ enum Command {
         source: PathBuf,
         expected: PathBuf,
     },
+    /// Convert records and count what the rules leave out: fields,
+    /// subfields and table keys
+    Coverage {
+        /// Rules: a file, or the name of built-in rules (see `list`)
+        #[arg(short, long, value_name = "FILE|NAME")]
+        rules: String,
+        /// Format of the input files
+        #[arg(short, long, value_name = "FORMAT", default_value = "iso2709")]
+        deserialize: ArgFormat,
+        /// Number of missing table keys shown per table
+        #[arg(long, value_name = "N", default_value_t = 10)]
+        examples: usize,
+        files: Vec<PathBuf>,
+    },
     /// List the built-in rules
     List,
     /// Print built-in rules, to start a rules file of one's own
@@ -106,6 +120,10 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         }
         Command::Eval { rules, deserialize, show, examples, pairs, source, expected } => {
             eval(&load(&rules)?, deserialize.into(), &show, examples, pairs.as_ref(), &source, &expected)?;
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Coverage { rules, deserialize, examples, files } => {
+            coverage(&load(&rules)?, deserialize.into(), examples, &files)?;
             Ok(ExitCode::SUCCESS)
         }
         Command::List => {
@@ -249,6 +267,67 @@ fn eval(
             expected.iter().for_each(|line| println!("  - {line}"));
             produced.iter().for_each(|line| println!("  + {line}"));
         }
+    }
+    Ok(())
+}
+
+fn coverage(rules: &Rules, format: Format, examples: usize, files: &[PathBuf]) -> Result<(), Box<dyn Error>> {
+    // Counts in records: (records with the tag, records leaving some out)
+    let mut fields: BTreeMap<u16, (usize, usize)> = BTreeMap::new();
+    let mut subfields: BTreeMap<(u16, char), usize> = BTreeMap::new();
+    let mut misses: BTreeMap<String, HashMap<String, usize>> = BTreeMap::new();
+    let mut records = 0;
+    for file in files {
+        for record in Reader::new(format, BufReader::new(File::open(file)?)).filter_map(Result::ok) {
+            records += 1;
+            let (_, report) = rules.apply_with_report(&record);
+            let mut tags: Vec<u16> = record.fields.iter().map(|f| *f.tag()).collect();
+            tags.sort();
+            tags.dedup();
+            for tag in tags {
+                fields.entry(tag).or_default().0 += 1;
+            }
+            let mut unconverted = report.unconverted_fields;
+            unconverted.sort();
+            unconverted.dedup();
+            for tag in unconverted {
+                fields.entry(tag).or_default().1 += 1;
+            }
+            let mut codes = report.unconverted_subfields;
+            codes.sort();
+            codes.dedup();
+            for code in codes {
+                *subfields.entry(code).or_default() += 1;
+            }
+            for (table, key) in report.table_misses {
+                *misses.entry(table).or_default().entry(key).or_default() += 1;
+            }
+        }
+    }
+
+    if let Some(name) = rules.name() {
+        println!("{name} {}", rules.version().unwrap_or(""));
+    }
+    println!("{records} records\n");
+    println!("tag  records unconverted      %");
+    let mut tags: Vec<_> = fields.iter().filter(|(_, (_, u))| *u > 0).collect();
+    tags.sort_by_key(|(tag, (_, u))| (std::cmp::Reverse(*u), **tag));
+    for (tag, (n, u)) in tags {
+        println!("{tag:03} {n:8} {u:11} {:6.1}", percent(*u, *n));
+    }
+    println!("\nsubfields left out (records)");
+    let mut codes: Vec<_> = subfields.iter().collect();
+    codes.sort_by_key(|((tag, code), n)| (std::cmp::Reverse(**n), *tag, *code));
+    for ((tag, code), n) in codes {
+        println!("{tag:03}${code} {n}");
+    }
+    println!("\ntable keys missing (lookups)");
+    for (table, keys) in &misses {
+        let mut keys: Vec<_> = keys.iter().collect();
+        keys.sort_by_key(|(key, n)| (std::cmp::Reverse(**n), key.as_str()));
+        let total: usize = keys.iter().map(|(_, n)| **n).sum();
+        let shown: Vec<String> = keys.iter().take(examples).map(|(key, n)| format!("{key:?} {n}")).collect();
+        println!("{table} {total}: {}", shown.join(", "));
     }
     Ok(())
 }

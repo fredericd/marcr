@@ -195,6 +195,7 @@ pub(crate) enum Test {
 /// (`* = ...`).
 #[derive(Default)]
 pub(crate) struct Table {
+    pub name: String,
     pub entries: HashMap<String, Vec<String>>,
     pub default: Option<Vec<String>>,
 }
@@ -324,6 +325,15 @@ impl<'a> Parser<'a> {
                         Some('n') => s.push('\n'),
                         Some('t') => s.push('\t'),
                         Some(c @ ('\\' | '"' | '\'')) => s.push(c),
+                        // \u{98}: a character by its code point
+                        Some('u') if self.chars.get(self.pos + 1) == Some(&'{') => {
+                            let hex: String = self.chars[self.pos + 2..].iter().take_while(|c| **c != '}').collect();
+                            match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                                Some(c) => s.push(c),
+                                None => return self.error(format!("invalid escape `\\u{{{hex}}}`")),
+                            }
+                            self.pos += hex.len() + 2;
+                        }
                         Some(c) => {
                             s.push('\\');
                             s.push(c);
@@ -387,7 +397,7 @@ impl<'a> Parser<'a> {
                         return self.error(format!("table `{name}` already declared"));
                     }
                     self.skip_ws();
-                    parsed.tables.push(self.table()?);
+                    parsed.tables.push(Table { name: name.clone(), ..self.table()? });
                     self.table_names.push(name);
                 }
                 _ => {

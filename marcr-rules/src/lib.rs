@@ -10,10 +10,12 @@
 //! let marc21 = rules.apply(&unimarc);
 //! ```
 
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use marcr::Record;
+use marcr::{Field, Record};
 
 mod engine;
 mod syntax;
@@ -23,6 +25,7 @@ mod tests;
 /// The rules files provided with the crate: (name, content).
 pub const BUILTIN: &[(&str, &str)] = &[
     ("unimarc-to-marc21", include_str!("../rules/unimarc-to-marc21.rules")),
+    ("marc21-to-unimarc", include_str!("../rules/marc21-to-unimarc.rules")),
 ];
 
 /// A compiled set of conversion rules.
@@ -66,7 +69,50 @@ impl Rules {
     /// Converts `record`. Fields are sorted by tag; a field that no rule
     /// converts is dropped, unless a `*` rule takes it.
     pub fn apply(&self, record: &Record) -> Record {
-        engine::apply(&self.parsed, record)
+        engine::apply(&self.parsed, record, None)
+    }
+
+    /// Converts `record` like [`Rules::apply`], and reports what the rules
+    /// leave out of it.
+    pub fn apply_with_report(&self, record: &Record) -> (Record, Report) {
+        let report = RefCell::new(Report::default());
+        let converted = engine::apply(&self.parsed, record, Some(&report));
+        (converted, report.into_inner())
+    }
+}
+
+/// What [`Rules::apply_with_report`] leaves out of a record: neither
+/// converted by a rule nor read by an expression.
+#[derive(Debug, Default)]
+pub struct Report {
+    /// Tags of the fields that no rule converts (`*` rules aside).
+    pub unconverted_fields: Vec<u16>,
+    /// Tag and code of the subfields that no body line selects, in fields
+    /// converted to data fields.
+    pub unconverted_subfields: Vec<(u16, char)>,
+    /// Table name and key of the lookups of a key missing from a table
+    /// without a `*` entry.
+    pub table_misses: Vec<(String, String)>,
+    /// Indexes of the fields no rule converts, and of the subfields no
+    /// body line selects (field, subfield).
+    left_fields: Vec<usize>,
+    left_subfields: Vec<(usize, usize)>,
+    /// Fields, or subfields of a code, read by an expression: not left out.
+    read: HashSet<(usize, Option<char>)>,
+}
+
+impl Report {
+    /// Fills the public lists from what was left out and not read.
+    fn finish(&mut self, record: &Record) {
+        let read = |i: usize, code: Option<char>| self.read.contains(&(i, None)) || self.read.contains(&(i, code));
+        let fields = self.left_fields.iter()
+            .filter(|i| !self.read.iter().any(|(j, _)| j == *i))
+            .map(|i| *record.fields[*i].tag());
+        let subfields = self.left_subfields.iter().filter_map(|(i, k)| match &record.fields[*i] {
+            Field::Standard(tag, _, subfields) if !read(*i, Some(subfields[*k].0)) => Some((*tag, subfields[*k].0)),
+            _ => None,
+        });
+        (self.unconverted_fields, self.unconverted_subfields) = (fields.collect(), subfields.collect());
     }
 }
 

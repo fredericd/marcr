@@ -1,0 +1,1383 @@
+# MARC21 to UNIMARC, written after the MARC 21 and UNIMARC Bibliographic
+# (IFLA) formats, and checked on native MARC21 records of the Library of
+# Congress (see corpus/ in the marcr-rules repository).
+#
+# MARC21 carries ISBD punctuation inside subfields; UNIMARC leaves it to
+# display. Trailing " /", " :", " ;", " =", "," are removed, and a final
+# period after a word of four letters or more, a digit or a bracket: one
+# after a shorter word is kept, as it may end an abbreviation ("ed.",
+# "p.", "J."). That chain is written out in each rule:
+#   replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+#
+# Not converted yet: coded data of maps, music, sound recordings,
+# visual materials and electronic resources (MARC 006, 007, 008/18-34
+# outside books and serials), 880 alternate graphic representations.
+
+rules "MARC21 to UNIMARC"
+version 0.1
+
+# ---- Tables ---------------------------------------------------------
+
+# Leader/05 record status
+table status {
+  a = c
+}
+
+# Leader/06 type of record
+table type {
+  m = l
+  o = m
+  p = m
+  t = b
+}
+
+# Leader/07 bibliographic level
+table level {
+  b = a
+  d = m
+}
+
+# Leader/17 encoding level (OCLC codes too)
+table encoding {
+  2 = 3
+  4 = " "
+  5 = 2
+  7 = 3
+  8 = 2
+  I = " "
+  J = 3
+  K = 3
+  L = 1
+  M = " "
+  u = " "
+  z = " "
+}
+
+# 008/06 type of date -> 100/08 type of publication date
+table datetype {
+  b = u
+  c = a
+  d = b
+  e = j
+  i = g
+  k = g
+  m = g
+  n = u
+  p = i
+  q = f
+  r = e
+  s = d
+  t = h
+  u = c
+  "|" = u
+}
+
+# 008/07-14 unknown digits: blanks in UNIMARC
+table unknown {
+  u = " "
+  "|" = " "
+}
+
+# 008/22 target audience (blank and fill already turned to u)
+table audience {
+  a = b
+  b = c
+  c = d
+  d = e
+  e = m
+  f = k
+  g = m
+  j = a
+}
+
+# 008/28 government publication (blank already turned to y)
+table government {
+  a = z
+  c = e
+  f = a
+  i = f
+  l = d
+  m = e
+  o = h
+  s = b
+  "|" = u
+}
+
+# 008/18-21 (books) illustrations -> 105/0-3
+table illustrations {
+  o = a
+  p = o
+}
+
+# 008/24-27 (books) nature of contents -> 105/4-7
+table contents {
+  a = d
+  b = a
+  c = b
+  d = e
+  e = f
+  f = z
+  g = z
+  i = c
+  j = k
+  k = a
+  l = n
+  m = m
+  n = r
+  o = r
+  p = j
+  q = a
+  r = g
+  s = i
+  t = p
+  u = l
+  v = n
+  w = n
+  y = z
+  z = s
+  2 = z
+  5 = z
+  6 = t
+}
+
+# 008/33 (books) literary form -> 105/11
+table literature {
+  0 = y
+  1 = a
+  c = z
+  d = b
+  e = c
+  f = a
+  h = d
+  i = e
+  j = f
+  m = z
+  p = g
+  s = h
+  u = z
+}
+
+# 008/23 form of item (blank already turned to r) -> 106
+table itemform {
+  a = t
+  b = t
+  c = t
+  o = s
+  q = s
+}
+
+# 008/21 (serials) type of continuing resource -> 110/0
+table serialtype {
+  d = f
+  l = e
+  m = b
+  n = c
+  p = a
+  w = g
+  " " = z
+}
+
+# 008/18 (serials) frequency (blank already turned to y) -> 110/1
+table frequency {
+  a = k
+  b = g
+  c = b
+  d = a
+  e = d
+  f = j
+  g = l
+  h = m
+  i = n
+  j = o
+  k = p
+  m = f
+  q = h
+  s = e
+  t = i
+  w = c
+}
+
+# 008/19 (serials) regularity -> 110/2
+table regularity {
+  r = a
+  n = b
+  x = y
+}
+
+# 008/24-27 (serials) nature of contents -> 110/3-6
+table serialcontents {
+  a = d
+  b = a
+  c = b
+  d = e
+  e = f
+  f = z
+  g = n
+  h = p
+  i = c
+  k = a
+  l = l
+  n = r
+  o = k
+  q = a
+  r = g
+  s = i
+  t = z
+  v = o
+  w = m
+  y = h
+  z = z
+  5 = z
+  6 = t
+}
+
+# MARC country code (008/15-17, trimmed) -> ISO 3166 (102). US states,
+# Canadian provinces, UK countries and Australian states go to their
+# country. xx (no place) and vp (various places): XX, unknown.
+table country {
+  aa = AL
+  abc = CA
+  aca = AU
+  ae = DZ
+  af = AF
+  ag = AR
+  ai = AM
+  aj = AZ
+  aku = US
+  alu = US
+  am = AI
+  an = AD
+  ao = AO
+  aq = AG
+  aru = US
+  as = AS
+  at = AU
+  au = AT
+  aw = AW
+  ay = AQ
+  azu = US
+  ba = BH
+  bb = BB
+  bcc = CA
+  bd = BI
+  be = BE
+  bf = BS
+  bg = BD
+  bh = BZ
+  bl = BR
+  bm = BM
+  bn = BA
+  bo = BO
+  bp = SB
+  br = MM
+  bs = BW
+  bt = BT
+  bu = BG
+  bw = BY
+  bx = BN
+  ca = CW
+  cau = US
+  cb = KH
+  cc = CN
+  cd = TD
+  ce = LK
+  cf = CG
+  cg = CD
+  ch = TW
+  ci = HR
+  cj = KY
+  ck = CO
+  cl = CL
+  cm = CM
+  cou = US
+  cq = KM
+  cr = CR
+  ctu = US
+  cu = CU
+  cv = CV
+  cw = CK
+  cx = CF
+  cy = CY
+  dcu = US
+  deu = US
+  dk = DK
+  dm = BJ
+  dq = DM
+  dr = DO
+  ea = ER
+  ec = EC
+  eg = GQ
+  em = TL
+  enk = GB
+  er = EE
+  es = SV
+  et = ET
+  fa = FO
+  fg = GF
+  fi = FI
+  fj = FJ
+  fk = FK
+  flu = US
+  fm = FM
+  fp = PF
+  fr = FR
+  ft = DJ
+  gau = US
+  gb = KI
+  gd = GD
+  gh = GH
+  gi = GI
+  gl = GL
+  gm = GM
+  go = GA
+  gp = GP
+  gr = GR
+  gs = GE
+  gt = GT
+  gu = GU
+  gv = GN
+  gw = DE
+  gy = GY
+  hiu = US
+  ho = HN
+  ht = HT
+  hu = HU
+  iau = US
+  ic = IS
+  idu = US
+  ie = IE
+  ii = IN
+  ilu = US
+  inu = US
+  io = ID
+  iq = IQ
+  ir = IR
+  is = IL
+  it = IT
+  iv = CI
+  ja = JP
+  jm = JM
+  jo = JO
+  ke = KE
+  kg = KG
+  kn = KP
+  ko = KR
+  ksu = US
+  ku = KW
+  kyu = US
+  kz = KZ
+  lau = US
+  lb = LR
+  le = LB
+  lh = LI
+  li = LT
+  lo = LS
+  ls = LA
+  lu = LU
+  lv = LV
+  ly = LY
+  mau = US
+  mbc = CA
+  mc = MC
+  mdu = US
+  meu = US
+  mf = MU
+  mg = MG
+  miu = US
+  mj = MS
+  mk = OM
+  ml = ML
+  mm = MT
+  mnu = US
+  mo = ME
+  mou = US
+  mp = MN
+  mq = MQ
+  mr = MA
+  msu = US
+  mtu = US
+  mu = MR
+  mv = MD
+  mw = MW
+  mx = MX
+  my = MY
+  mz = MZ
+  nbu = US
+  ncu = US
+  ndu = US
+  ne = NL
+  nfc = CA
+  ng = NE
+  nhu = US
+  nik = GB
+  nju = US
+  nkc = CA
+  nl = NC
+  nmu = US
+  nn = VU
+  no = NO
+  np = NP
+  nq = NI
+  nr = NG
+  nsc = CA
+  ntc = CA
+  nu = NR
+  nuc = CA
+  nvu = US
+  nw = MP
+  nyu = US
+  nz = NZ
+  ohu = US
+  oku = US
+  onc = CA
+  oru = US
+  pau = US
+  pe = PE
+  pg = GW
+  ph = PH
+  pic = CA
+  pk = PK
+  pl = PL
+  pn = PA
+  po = PT
+  pp = PG
+  pr = PR
+  pw = PW
+  py = PY
+  qa = QA
+  qea = AU
+  quc = CA
+  rb = RS
+  re = RE
+  rh = ZW
+  riu = US
+  rm = RO
+  ru = RU
+  rw = RW
+  sa = ZA
+  scu = US
+  sd = SS
+  sdu = US
+  se = SC
+  sf = ST
+  sg = SN
+  sh = ES
+  si = SG
+  sj = SD
+  sl = SL
+  sm = SM
+  snc = CA
+  so = SO
+  sp = ES
+  sq = SZ
+  sr = SR
+  ss = EH
+  stk = GB
+  su = SA
+  sw = SE
+  sx = NA
+  sy = SY
+  sz = CH
+  ta = TJ
+  tc = TC
+  tg = TG
+  th = TH
+  ti = TN
+  tk = TM
+  tl = TK
+  tma = AU
+  tnu = US
+  to = TO
+  tr = TT
+  ts = AE
+  tu = TR
+  tv = TV
+  txu = US
+  tz = TZ
+  ua = EG
+  ug = UG
+  un = UA
+  us = US
+  utu = US
+  uv = BF
+  uy = UY
+  uz = UZ
+  vau = US
+  vb = VG
+  vc = VA
+  ve = VE
+  vi = VI
+  vm = VN
+  vp = XX
+  vra = AU
+  vtu = US
+  wau = US
+  wea = AU
+  wf = WF
+  wiu = US
+  wj = PS
+  wlk = GB
+  ws = WS
+  wvu = US
+  wyu = US
+  xa = CX
+  xb = CC
+  xc = MV
+  xd = KN
+  xe = MH
+  xf = UM
+  xh = NU
+  xj = SH
+  xk = LC
+  xl = PM
+  xm = VC
+  xn = MK
+  xna = AU
+  xo = SK
+  xoa = AU
+  xr = CZ
+  xra = AU
+  xv = SI
+  xx = XX
+  xxc = CA
+  xxk = GB
+  xxu = US
+  ye = YE
+  ykc = CA
+  za = ZM
+  # Former countries
+  xxr = SU
+  cs = CS
+  ge = DD
+  ur = SU
+  yu = YU
+}
+
+# MARC relator code or term ($4, or $e lowercased without final
+# punctuation) -> UNIMARC relator code
+table relators {
+  act = 005
+  actor = 005
+  cast = 005
+  adp = 010
+  adapter = 010
+  arr = 030
+  arranger = 030
+  arranger of music = 030
+  art = 040
+  artist = 040
+  aut = 070
+  author = 070
+  joint author = 070
+  writing = 070
+  cre = 070
+  creator = 070
+  aui = 080
+  writer of introduction = 080
+  writer of preface = 080
+  writer of foreword = 080
+  writer of prologue = 080
+  ctg = 180
+  cartographer = 180
+  cnd = 250
+  conductor = 250
+  csl = 255
+  consultant = 255
+  ctb = 205
+  contributor = 205
+  com = 220
+  comp = 220
+  compiler = 220
+  cmp = 230
+  composer = 230
+  composer (expression) = 230
+  cph = 260
+  copyright claimant = 260
+  copyright holder = 260
+  dte = 280
+  dedicatee = 280
+  drt = 300
+  director = 300
+  direction = 300
+  film director = 300
+  dst = 310
+  distributor = 310
+  film distributor = 310
+  dnr = 320
+  donor = 320
+  edt = 340
+  ed = 340
+  editor = 340
+  editing = 340
+  joint ed = 340
+  edc = 340
+  editor of compilation = 340
+  egr = 350
+  engraver = 350
+  fmo = 390
+  former owner = 390
+  hnr = 420
+  honoree = 420
+  honouree = 420
+  ill = 440
+  illustrator = 440
+  ive = 460
+  interviewee = 460
+  ivr = 470
+  interviewer = 470
+  isb = 475
+  issuing body = 475
+  lbt = 480
+  librettist = 480
+  lyr = 520
+  lyricist = 520
+  itr = 545
+  instrumentalist = 545
+  nrt = 550
+  narrator = 550
+  orm = 557
+  organizer = 557
+  prf = 590
+  performer = 590
+  pht = 600
+  photographer = 600
+  pre = 605
+  presenter = 605
+  prt = 610
+  printer = 610
+  pro = 630
+  producer = 630
+  production = 630
+  film producer = 630
+  audio producer = 630
+  pbl = 650
+  publisher = 650
+  aus = 690
+  screenwriter = 690
+  sng = 721
+  singer = 721
+  spk = 590
+  speaker = 590
+  pnc = 040
+  penciller = 040
+  ink = 040
+  inker = 040
+  clr = 040
+  colorist = 040
+  ltr = 040
+  letterer = 040
+  production company = 630
+  music = 230
+  spn = 723
+  sponsor = 723
+  sponsoring body = 723
+  trl = 730
+  tr = 730
+  translator = 730
+  wam = 770
+  writer of accompanying material = 770
+  writer of supplementary textual content = 770
+  wac = 210
+  writer of added commentary = 210
+}
+
+# Subject heading indicator 2 -> $2 (4 and 7: no code, or the field's $2)
+table subjectsource {
+  0 = lcsh
+  1 = lcshac
+  2 = mesh
+  3 = nal
+  4 = ""
+  5 = cash
+  6 = rvm
+  7 = ""
+}
+
+# 015 $2 -> country of the national bibliography (020 $a)
+table nbsource {
+  bnb = GB
+  dnb = DE
+  nznb = NZ
+  bnf = FR
+  ccb = CN
+  sanb = ZA
+  can = CA
+}
+
+# Organization code -> country (801 $a)
+table orgcountry {
+  DLC = US
+  DNLM = US
+  DNAL = US
+  NjP = US
+  UKMGB = GB
+  NLC = CA
+  CaOONL = CA
+  * = ""
+}
+
+# 246 indicator 1: added entry -> title significant (5XX indicator 1)
+table added {
+  0 = 0
+  1 = 1
+  2 = 0
+  3 = 1
+}
+
+# MARC indicator "display note" (0) -> UNIMARC "print note" (1)
+table note {
+  0 = 1
+  1 = 0
+}
+
+# 490 indicator 1 (0 untraced, 1 traced differently) -> 225 indicator 1
+table ind225 {
+  0 = 1
+  1 = 0
+}
+
+# 264 indicator 2 (0 production, 1 publication) -> 214 indicator 2
+table ind214 {
+  0 = 1
+  1 = 0
+}
+
+# 505 indicator 1 (0 complete, 1 incomplete, 2 partial) -> 327 indicator 1
+table ind327 {
+  0 = 1
+  1 = 0
+  8 = 1
+}
+
+# 028 indicator 1 (6 distributor number) and 2 (note) -> 071
+table ind071 {
+  6 = 5
+}
+table note071 {
+  0 = 0
+  1 = 1
+  2 = 1
+  3 = 0
+}
+
+# ---- Leader and coded data ------------------------------------------
+
+record -> LDR "{LDR/0-4}{LDR/5|tr(status)}{LDR/6|tr(type)}{LDR/7|tr(level)}  2200000{LDR/17|tr(encoding)}{LDR/18|replace('^ $', 'n')|replace('^[aci]$', ' ')|replace('^u$', 'i')} 450 "
+
+# 100 general processing data. Date entered: 008/00-05, 00-29 read as
+# 20XX (MARC 21 records date from 1968). Target audience (008/22) and
+# government publication (008/28) only exist for some types; character
+# set: UTF-8 (50), script of title: Latin (ba).
+record when LDR~^.{6}([gkmor].|[at][^bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
+record when LDR~^.{6}[cdij] -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}{008/22|replace('[ |]', 'u')|tr(audience)}  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
+record when LDR~^.{6}([ef].|a[bis]) -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  {008/28|replace(' ', 'y')|tr(government)}{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
+record when LDR~^.{6}p -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}{008/6|tr(datetype)}{008/7-10|tr(unknown)}{008/11-14|tr(unknown)}u  u{008/38|replace('^x$', '1')|replace('^[^1]$', '0')}{040b|default('eng')}y50      ba" }
+
+# 101 language: 041 with MARC codes (not those with a $2), else 008/35-37
+041 when !$2 -> 101 [{@ind1|replace(' ', '0')}#] {
+  $a -> $a
+  $d -> $a
+  $k -> $b
+  $h -> $c
+  $b -> $d
+  $f -> $e
+  $e -> $h
+  $g -> $i
+  $j -> $j
+}
+record when !041 -> 101 [0#] { -> $a "{008/35-37|trim|replace('^\|+$', '')}" }
+
+record -> 102 [##] { -> $a "{008/15-17|trim|table(country)}" }
+
+# 105 textual material (books)
+record when LDR~^.{6}[at][^bis] -> 105 [##] { -> $a "{008/18-21|tr(illustrations)|replace('^    $', 'y   ')}{008/24-27|tr(contents)}{008/29}{008/30}{008/31}{008/33|tr(literature)}{008/34|replace(' ', 'y')}" }
+
+# 106 form of item (textual material, printed music)
+record when LDR~^.{6}[acdpt] -> 106 [##] { -> $a "{008/23|replace(' ', 'r')|tr(itemform)}" }
+
+# 110 continuing resources: type, frequency, regularity, nature of the
+# entire work and of contents, conference; title page and index
+# availability are not in MARC 21
+record when LDR~^.{6}a[is] -> 110 [##] { -> $a "{008/21|tr(serialtype)}{008/18|replace(' ', 'y')|tr(frequency)}{008/19|tr(regularity)}{008/24-27|tr(serialcontents)}{008/29}|||" }
+
+# ---- Identifiers ----------------------------------------------------
+
+001 -> 001
+005 -> 005
+
+# ISBN: qualifier in parentheses after the number in older records
+020 -> 010 [##] {
+  $a -> $a | replace(' .*$', ''), $b | replace('^\S+ ?', '') | replace('^\((.*)\)[ :;]*$', '$1') | replace('[ :;]+$', '')
+  $q -> $b | replace('^\((.*)\)$', '$1')
+  $c -> $d | replace(' *[/:;=,]? *$', '')
+  $z -> $z | replace(' .*$', '')
+}
+
+022 -> 011 [{@ind1}#] {
+  $a -> $a
+  $l -> $f
+  $m -> $g
+  $z -> $y
+  $y -> $z
+}
+
+# Other standard identifiers, by indicator 1: ISRC, UPC, ISMN, EAN
+024 when @ind1=0 -> 016 [##] {
+  $a -> $a
+  $c -> $d
+  $q -> $b
+  $z -> $z
+  $2 -> $2
+}
+024 when @ind1=1 -> 072 [##] like 024
+024 when @ind1=2 -> 013 [##] like 024
+024 when @ind1=3 -> 073 [##] like 024
+024 when @ind1~[478] -> 017 [{@ind1}#] like 024
+
+# Publisher number
+028 -> 071 [{@ind1|tr(ind071)}{@ind2|tr(note071)}] {
+  $a -> $a
+  $b -> $b
+}
+
+# LCCN and national bibliography numbers
+010 -> 020 [##] {
+  -> $a "US"
+  $a -> $b | trim
+  $z -> $z | trim
+}
+015 -> 020 [##] {
+  -> $a "{$2|table(nbsource)}"
+  $a -> $b | replace(' *[/:;=,]? *$', '')
+  $z -> $z
+}
+
+034 -> 123 [{@ind1}#] {
+  $a -> $a | replace('z', 'c')
+  $b -> $b
+  $c -> $c
+  $d -> $d
+  $e -> $e
+  $f -> $f
+  $g -> $g
+}
+
+035 -> 035 [##] {
+  $a -> $a
+  $z -> $z
+}
+
+# Cataloguing sources: original, transcribing and (last) modifying agency
+040 -> 801 [#0] {
+  -> $a "{$a|table(orgcountry)}"
+  $a -> $b
+  -> $c "{008/0-5|replace('^([0-2])', '20$1')|replace('^([3-9])', '19$1')}"
+  -> $g "{LDR/18}{$e|exists('+', '')}" | replace('^a$', 'AACR2') | replace('^[^A].*$', '')
+  $e -> $g | upper
+  order $a $b $c $g
+}
+040 when $c -> 801 [#1] {
+  -> $a "{$c|table(orgcountry)}"
+  -> $b "{$c}"
+}
+040 when $d -> 801 [#2] {
+  -> $a "{$d[-1]|table(orgcountry)}"
+  -> $b "{$d[-1]}"
+  -> $c "{005/0-7}"
+  order $a $b $c
+}
+
+# Geographic area codes. shortcut: repeated $a stay in one 660, which
+# UNIMARC does not repeat; one field per code needs a field per subfield.
+043 -> 660 [##] { $a -> $a }
+
+# ---- Classification -------------------------------------------------
+
+050 -> 680 [##] {
+  $a[1] -> $a
+  $b[1] -> $b
+}
+060 -> 686 [##] {
+  $a[1] -> $a "{}{$b|default('')}"
+  -> $2 "nlm"
+}
+080 -> 675 [##] {
+  $a -> $a "{}{$x*|join('')}"
+  $2 -> $v
+}
+# Prime marks are left out
+082 -> 676 [##] {
+  $a[1] -> $a | replace('/', '')
+  $2 -> $v
+}
+084 -> 686 [##] {
+  $a -> $a
+  $b -> $c
+  $2 -> $2
+}
+
+# ---- Titles ---------------------------------------------------------
+
+# Title: nonfiling characters (indicator 2) between NSB and NSE; a $b
+# after a $a ending with "=" is a parallel title. Statements of
+# responsibility after the first (" ; ") go to $g.
+245 when !$a~=$ -> 200 [1#] {
+  $a -> $a "{@ind2}{}" | replace('^1(.)', '\u{98}$1\u{9c}') | replace('^2(.{2})', '\u{98}$1\u{9c}') | replace('^3(.{3})', '\u{98}$1\u{9c}') | replace('^4(.{4})', '\u{98}$1\u{9c}') | replace('^5(.{5})', '\u{98}$1\u{9c}') | replace('^6(.{6})', '\u{98}$1\u{9c}') | replace('^7(.{7})', '\u{98}$1\u{9c}') | replace('^8(.{8})', '\u{98}$1\u{9c}') | replace('^9(.{9})', '\u{98}$1\u{9c}') | replace('^[0-9]', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $h -> $b | replace('[\[\]]', '') | replace(' *[/:;=,.]$', '')
+  $b -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $f -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $g -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $k -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $f | replace(' ; .*$', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1'), $g | replace('^[^;]*$', '') | replace('^[^;]*; *', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+245 when $a~=$ -> 200 [1#] {
+  $a -> $a "{@ind2}{}" | replace('^1(.)', '\u{98}$1\u{9c}') | replace('^2(.{2})', '\u{98}$1\u{9c}') | replace('^3(.{3})', '\u{98}$1\u{9c}') | replace('^4(.{4})', '\u{98}$1\u{9c}') | replace('^5(.{5})', '\u{98}$1\u{9c}') | replace('^6(.{6})', '\u{98}$1\u{9c}') | replace('^7(.{7})', '\u{98}$1\u{9c}') | replace('^8(.{8})', '\u{98}$1\u{9c}') | replace('^9(.{9})', '\u{98}$1\u{9c}') | replace('^[0-9]', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $h -> $b | replace('[\[\]]', '') | replace(' *[/:;=,.]$', '')
+  $b -> $d | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $f | replace(' ; .*$', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1'), $g | replace('^[^;]*$', '') | replace('^[^;]*; *', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+
+# Uniform titles: main entry (130), with a name (240), added (730)
+130 -> 500 [11] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $f -> $k | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $k -> $l | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $l -> $m | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $g -> $n | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $s -> $q | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $m -> $r | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $r -> $u | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $o -> $w | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+240 -> 500 [10] like 130
+730 when !$i -> 500 [10] like 130
+243 -> 501 [1#] like 130
+
+# Variant titles, by indicator 2 of 246: parallel, cover, added title
+# page, caption, running, spine, other
+246 when @ind2=1 -> 510 [{@ind1|tr(added)}#] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $f -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+246 when @ind2=4 -> 512 [{@ind1|tr(added)}#] like 246
+246 when @ind2=5 -> 513 [{@ind1|tr(added)}#] like 246
+246 when @ind2=6 -> 514 [{@ind1|tr(added)}#] like 246
+246 when @ind2=7 -> 515 [{@ind1|tr(added)}#] like 246
+246 when @ind2=8 -> 516 [{@ind1|tr(added)}#] like 246
+246 when @ind2~'^[ 023]$' -> 517 [{@ind1|tr(added)}#] like 246
+740 -> 517 [1#] like 246
+247 -> 520 [##] like 246
+
+210 -> 531 [##] {
+  $a -> $a
+  $b -> $b | replace('^\((.*)\)$', '$1')
+}
+222 -> 530 [0#] {
+  $a -> $a
+  $b -> $b | replace('^\((.*)\)$', '$1')
+}
+
+# ---- Description ----------------------------------------------------
+
+250 -> 205 [##] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $f | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+
+254 -> 208 [##] { $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1') }
+
+255 -> 206 [##] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $b | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $c | replace('^\(', '') | replace('\)\.?$', '')
+}
+
+256 -> 230 [##] { $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1') }
+
+# Publication: 260 -> 210; 264 -> 214, whose indicator 2 (function)
+# follows that of 264 with production and publication swapped. The
+# final period of the field never follows a place: "Mass." keeps its.
+260 -> 210 [##] {
+  $a -> $a | replace(' *[/:;=,]? *$', '')
+  $b -> $c | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $d | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $e -> $e | replace('^\(', '') | replace(' *[/:;=,]? *$', '')
+  $f -> $g | replace(' *[/:;=,]? *$', '')
+  $g -> $h | replace('\)\.?$', '') | replace(' *[/:;=,]? *$', '')
+}
+264 -> 214 [#{@ind2|tr(ind214)}] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $c | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $d | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+
+# Physical description; "cm." is an abbreviation that UNIMARC writes
+# without a period
+300 -> 215 [##] {
+  $a -> $a | replace(' *[/:;=,+]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $f -> += " {}" | replace(' *[/:;=,+]? *$', '')
+  $g -> += " {}" | replace(' *[/:;=,+]? *$', '')
+  $b -> $c | replace(' *[/:;=,+]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $d | replace(' *[/:;=,+]? *$', '') | replace(' cm\.$', ' cm') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $e -> $e | replace('^\(', '') | replace('\)\.?$', '') | replace(' *[/:;=,+]? *$', '')
+}
+
+306 -> 127 [##] { $a -> $a }
+
+310 -> 326 [##] {
+  $a -> $a | replace(' *[/:;=,]? *$', '')
+  $b -> $b | replace(' *[/:;=,]? *$', '')
+}
+321 -> 326 [##] like 310
+
+# Content, media and carrier types
+336 -> 181 [##] {
+  $b -> $c
+  $2 -> $2
+}
+337 -> 182 [##] {
+  $b -> $c
+  $2 -> $2
+}
+338 -> 183 [##] {
+  $b -> $a
+  $2 -> $2
+}
+
+# Numbering of serials: indicator 1 formatted (0) or not (1)
+362 -> 207 [#{@ind1}] {
+  $a -> $a | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $z -> $z
+}
+
+# ---- Series ---------------------------------------------------------
+
+490 -> 225 [{@ind1|tr(ind225)}#] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '')
+  $v -> $v | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+}
+440 -> 225 [2#] like 490
+
+830 -> 410 [#0] {
+  $a -> $t | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $v | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '')
+  $w -> $0
+}
+440 -> 410 [#0] like 830
+800 -> 410 [#0] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $d -> += " {}" | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $t -> $t | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $v | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '')
+  $w -> $0
+}
+810 -> 410 [#0] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> += ". {}" | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $t -> $t | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $v | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '')
+  $w -> $0
+}
+
+# ---- Notes ----------------------------------------------------------
+
+500 -> 300 [##] { $a -> $a }
+501 -> 300 [##] { $a -> $a }
+502 -> 328 [##] {
+  $a -> $a
+  $b -> $b
+  $c -> $e
+  $d -> $d
+  $g -> $z
+}
+504 -> 320 [##] { $a -> $a }
+505 -> 327 [{@ind1|tr(ind327)}#] {
+  $a -> $a
+  $t -> $a | replace(' *(--|[/:;=,.])$', '')
+  $r -> += " / {}" | replace(' *(--|[/:;=,.])$', '')
+  $g -> += " {}" | replace(' *(--|[/:;=,.])$', '')
+}
+506 -> 371 [0#] { $a -> $a }
+508 -> 322 [##] { $a -> $a }
+510 -> 321 [##] {
+  $a -> $a
+  $b -> $b
+  $c -> $c
+}
+511 -> 323 [##] { $a -> $a }
+515 -> 303 [##] { $a -> $a }
+518 -> 300 [##] {
+  $a -> $a
+  $d -> $a
+  $o -> += " {}"
+  $p -> += " {}"
+}
+520 -> 330 [##] {
+  $a -> $a
+  $b -> += " {}"
+  $c -> += " {}"
+}
+521 -> 333 [##] { $a -> $a }
+524 -> 300 [##] { $a -> $a }
+525 -> 300 [##] { $a -> $a }
+530 -> 300 [##] { $a -> $a }
+533 -> 325 [##] {
+  $a -> $a
+  $b -> += " {}"
+  $c -> += " {}"
+  $d -> += " {}"
+  $e -> += " {}"
+  $f -> += " {}"
+  $n -> += " {}"
+}
+534 -> 324 [##] {
+  $p -> $a
+  $a -> += " {}"
+  $t -> += " {}"
+  $c -> += " {}"
+  $n -> += " {}"
+}
+538 -> 337 [##] { $a -> $a }
+540 -> 371 [1#] { $a -> $a }
+541 -> 317 [##] {
+  $a -> $a
+  $b -> += " {}"
+  $c -> += " {}"
+  $d -> += " {}"
+  $e -> += " {}"
+}
+545 -> 300 [##] { $a -> $a }
+546 -> 302 [##] {
+  $a -> $a
+  $b -> += " {}"
+}
+550 -> 314 [##] { $a -> $a }
+555 -> 320 [##] { $a -> $a }
+561 -> 317 [##] { $a -> $a }
+580 -> 311 [##] { $a -> $a }
+586 -> 334 [##] { $a -> $a }
+588 -> 303 [##] { $a -> $a }
+
+# ---- Linking entries ------------------------------------------------
+
+# Place, publisher and date of $d ("New York : Oxford University
+# Press, 2021.") go to $c, $n and $d
+773 -> 461 [#{@ind1|tr(note)}] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $t -> $t | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $e | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $d -> $c | replace(' *:.*$', '') | replace(' *[/:;=,]? *$', ''), $n | replace('^[^:]*$', '') | replace('^[^:]*: *', '') | replace(', *[^,]*$', '') | replace(' *[/:;=,]? *$', ''), $d | replace('^.*, *', '') | replace('^[^0-9]*$', '') | replace('([0-9)\]])\.$', '$1')
+  $h -> $p | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $g -> $v | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $w -> $0
+  $x -> $x
+  $z -> $y
+}
+760 -> 410 [#{@ind1|tr(note)}] like 773
+762 -> 411 [#{@ind1|tr(note)}] like 773
+765 -> 454 [#{@ind1|tr(note)}] like 773
+767 -> 453 [#{@ind1|tr(note)}] like 773
+770 -> 421 [#{@ind1|tr(note)}] like 773
+772 -> 422 [#{@ind1|tr(note)}] like 773
+774 -> 464 [#{@ind1|tr(note)}] like 773
+775 -> 451 [#{@ind1|tr(note)}] like 773
+776 -> 452 [#{@ind1|tr(note)}] like 773
+777 -> 423 [#{@ind1|tr(note)}] like 773
+786 -> 488 [#{@ind1|tr(note)}] like 773
+787 -> 488 [#{@ind1|tr(note)}] like 773
+
+# Preceding entries, by indicator 2: continues, continues in part,
+# supersedes, supersedes in part, formed by the union of, absorbed,
+# absorbed in part, separated from
+780 when @ind2=0 -> 430 [#{@ind1|tr(note)}] like 773
+780 when @ind2=1 -> 431 [#{@ind1|tr(note)}] like 773
+780 when @ind2=2 -> 432 [#{@ind1|tr(note)}] like 773
+780 when @ind2=3 -> 433 [#{@ind1|tr(note)}] like 773
+780 when @ind2=4 -> 436 [#{@ind1|tr(note)}] like 773
+780 when @ind2=5 -> 434 [#{@ind1|tr(note)}] like 773
+780 when @ind2=6 -> 435 [#{@ind1|tr(note)}] like 773
+780 when @ind2=7 -> 437 [#{@ind1|tr(note)}] like 773
+# Succeeding entries: continued by, continued in part by, superseded by,
+# superseded in part by, absorbed by, absorbed in part by, split into,
+# merged with ... to form, changed back to
+785 when @ind2=0 -> 440 [#{@ind1|tr(note)}] like 773
+785 when @ind2=1 -> 441 [#{@ind1|tr(note)}] like 773
+785 when @ind2=2 -> 442 [#{@ind1|tr(note)}] like 773
+785 when @ind2=3 -> 443 [#{@ind1|tr(note)}] like 773
+785 when @ind2=4 -> 444 [#{@ind1|tr(note)}] like 773
+785 when @ind2=5 -> 445 [#{@ind1|tr(note)}] like 773
+785 when @ind2=6 -> 446 [#{@ind1|tr(note)}] like 773
+785 when @ind2=7 -> 447 [#{@ind1|tr(note)}] like 773
+785 when @ind2=8 -> 448 [#{@ind1|tr(note)}] like 773
+
+# ---- Subjects -------------------------------------------------------
+
+# Personal names: "Surname, Forenames," split into $a and $b
+600 when !@ind1=3 when !$t -> 600 [#{@ind1}] {
+  -> $2 "{@ind2|table(subjectsource)}"
+  $a -> $a | replace(',.*$', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1'), $b | replace('^[^,]*,? *', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $d | replace(' *[/:;=,]? *$', '')
+  $c -> $c | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $d -> $f | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $q -> $g | replace('^\(', '') | replace('\),?$', '')
+  $x -> $x | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $z -> $y | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $2 -> $2
+  order $a $b $c $d $f $g $j $x $y $z $2
+}
+600 when @ind1=3 when !$t -> 602 [##] like 600
+
+610 when !$t -> 601 [0{@ind1}] {
+  -> $2 "{@ind2|table(subjectsource)}"
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $b | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $e | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $d -> $f | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $n -> $d | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $x -> $x | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $z -> $y | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $2 -> $2
+  order $a $b $d $e $f $j $x $y $z $2
+}
+611 when !$t -> 601 [1{@ind1}] like 610
+
+630 -> 605 [##] {
+  -> $2 "{@ind2|table(subjectsource)}"
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $n -> $h | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $p -> $i | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $l -> $m | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $f -> $k | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $z -> $y | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $2 -> $2
+  order $a $h $i $k $m $j $x $y $z $2
+}
+
+# Topical (606, indicator 1: level of the subject), geographic (607),
+# form or genre (608)
+650 -> 606 [{@ind1}#] {
+  -> $2 "{@ind2|table(subjectsource)}"
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $x -> $x | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $z -> $y | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $y -> $z | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $v -> $j | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $2 -> $2
+  order $a $j $x $y $z $2
+}
+651 -> 607 [##] like 650
+655 -> 608 [##] like 650
+
+653 -> 610 [{@ind1}#] { $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1') }
+
+# ---- Responsibility -------------------------------------------------
+
+# Personal names: 100 primary responsibility (700); 700 alternative
+# (701, authors and names without a relator) or secondary (702, other
+# relators); families (indicator 1 = 3) to 720, 721, 722. A name with a
+# title ($t) is a work, not converted here.
+100 when !@ind1=3 -> 700 [#{@ind1}] {
+  $a -> $a | replace(',.*$', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1'), $b | replace('^[^,]*,? *', '') | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $d | replace(' *[/:;=,]? *$', '')
+  $c -> $c | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $d -> $f | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $q -> $g | replace('^\(', '') | replace('\),?$', '')
+  $e -> $4 | lower | replace('[ .,]+$', '') | table(relators)
+  $4 -> $4 | replace('^.*/', '') | table(relators)
+  order $a $b $c $d $f $g $4
+}
+100 when @ind1=3 -> 720 [##] like 100
+700 when !@ind1=3 when !$t when !$e when !$4 -> 701 [#{@ind1}] like 100
+700 when !@ind1=3 when !$t when $e~'^(author|joint author|writing|creator)' -> 701 [#{@ind1}] like 100
+700 when !@ind1=3 when !$t when $e when !$e~'^(author|joint author|writing|creator)' -> 702 [#{@ind1}] like 100
+700 when !@ind1=3 when !$t when !$e when $4~aut$ -> 701 [#{@ind1}] like 100
+700 when !@ind1=3 when !$t when !$e when $4 when !$4~aut$ -> 702 [#{@ind1}] like 100
+700 when @ind1=3 when !$t -> 722 [##] like 100
+
+# Corporate names: indicator 1 of MARC (inverted, jurisdiction, direct
+# order) becomes indicator 2; 710 alternative (author) or secondary
+110 -> 710 [0{@ind1}] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $b -> $b | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $e | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $d -> $f | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $n -> $d | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $g -> $c | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $e -> $4 | lower | replace('[ .,]+$', '') | table(relators)
+  $4 -> $4 | replace('^.*/', '') | table(relators)
+  order $a $b $c $d $e $f $4
+}
+710 when !$t when $e~'^(author|joint author|writing|creator)' -> 711 [0{@ind1}] like 110
+710 when !$t when !$e~'^(author|joint author|writing|creator)' -> 712 [0{@ind1}] like 110
+
+# Meetings: $e is a subordinate unit, $j the relator
+111 -> 710 [1{@ind1}] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $e -> $b | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $q -> $b | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $c -> $e | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $d -> $f | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $n -> $d | replace('^\(', '') | replace('[ .,:;)]+$', '')
+  $j -> $4 | lower | replace('[ .,]+$', '') | table(relators)
+  $4 -> $4 | replace('^.*/', '') | table(relators)
+  order $a $b $d $e $f $4
+}
+711 when !$t -> 712 [1{@ind1}] like 111
+
+# Uncontrolled names
+720 when @ind1=1 -> 702 [##] {
+  $a -> $a | replace(' *[/:;=,]? *$', '') | replace('([\p{L}\p{M}]{4}|[0-9)\]])\.$', '$1')
+  $e -> $4 | lower | replace('[ .,]+$', '') | table(relators)
+  $4 -> $4 | replace('^.*/', '') | table(relators)
+}
+720 when !@ind1=1 -> 712 [02] like 720
+
+# ---- Acquisition, places ------------------------------------------
+
+037 -> 345 [##] {
+  $b -> $a
+  $a -> $b
+  $f -> $c
+  $c -> $d
+}
+
+# Place names: country, state, county, city... (same codes)
+752 -> 620 [##] {
+  $a -> $a | replace(' *[/:;=,.]? *$', '')
+  $b -> $b | replace(' *[/:;=,.]? *$', '')
+  $c -> $c | replace(' *[/:;=,.]? *$', '')
+  $d -> $d | replace(' *[/:;=,.]? *$', '')
+}
+662 -> 617 [##] like 752
+
+# ---- Electronic location --------------------------------------------
+
+856 -> 856 [{@ind1}#] {
+  $u -> $u
+  $z -> $z
+  $3 -> $z
+  $y -> $2
+  $q -> $q
+}

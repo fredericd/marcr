@@ -1,6 +1,10 @@
 //! Application of parsed rules to a record.
 
+use std::cell::RefCell;
+
 use marcr::{Field, Record, Subfield};
+
+use crate::Report;
 
 use crate::syntax::{in_range, Before, Body, Cond, Expr, Func, Idx, Ind, Operand, Output, Parsed, Piece, Source, Table, Target, Test, Value};
 
@@ -13,12 +17,14 @@ struct Ctx<'a> {
     /// The source subfield value (`{}`).
     current: Option<&'a str>,
     tables: &'a [Table],
+    /// Where to note what is not converted, if asked.
+    report: Option<&'a RefCell<Report>>,
 }
 
 /// Converts `record` with `parsed` rules.
-pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
+pub(crate) fn apply(parsed: &Parsed, record: &Record, report: Option<&RefCell<Report>>) -> Record {
     let mut target = Record { leader: record.leader, fields: Vec::new() };
-    let base = Ctx { record, field: None, current: None, tables: &parsed.tables };
+    let base = Ctx { record, field: None, current: None, tables: &parsed.tables, report };
     let produce = |rule_target: &Target, ctx: Ctx, target: &mut Record| match rule_target {
         Target::Leader(value) => {
             let leader = render(value, ctx);
@@ -49,6 +55,8 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
         let ctx = Ctx { field: Some(field), ..base };
         let same_tag = |fields: &[Field]| fields.iter().filter(|f| f.tag() == field.tag()).count();
         let mut converted = false;
+        // Subfields selected by a body line, None if no data field target
+        let mut taken: Option<Vec<bool>> = None;
         for rule in &parsed.rules {
             if matches!(&rule.source, Source::Tags(pats) if pats.iter().any(|pat| pat.matches(*field.tag())))
                 && (rule.rank == (1, None)
@@ -57,6 +65,21 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
             {
                 produce(&rule.target, ctx, &mut target);
                 converted = true;
+                if let (Some(_), Target::Data { body, .. }, Field::Standard(_, _, subfields)) = (report, &rule.target, field) {
+                    let taken = taken.get_or_insert_with(|| vec![false; subfields.len()]);
+                    for (k, t) in taken.iter_mut().enumerate() {
+                        *t |= selected(body, subfields, k);
+                    }
+                }
+            }
+        }
+        if let Some(report) = report {
+            let mut report = report.borrow_mut();
+            if !converted {
+                report.left_fields.push(i);
+            }
+            for (k, _) in taken.iter().flatten().enumerate().filter(|(_, t)| !**t) {
+                report.left_subfields.push((i, k));
             }
         }
         if !converted {
@@ -68,7 +91,28 @@ pub(crate) fn apply(parsed: &Parsed, record: &Record) -> Record {
         }
     }
     target.fields.sort_by_key(|field| *field.tag()); // stable
+    if let Some(report) = report {
+        report.borrow_mut().finish(record);
+    }
     target
+}
+
+/// Notes that the `index`th field of the record, or its `code` subfields,
+/// are read by an expression.
+fn read(ctx: Ctx, field: &Field, code: Option<char>) {
+    if let Some(report) = ctx.report
+        && let Some(index) = ctx.record.fields.iter().position(|f| std::ptr::eq(f, field))
+    {
+        report.borrow_mut().read.insert((index, code));
+    }
+}
+
+/// Whether a line of `body` selects the `k`th of `subfields`.
+fn selected(body: &Body, subfields: &[Subfield], k: usize) -> bool {
+    let code = subfields[k].0;
+    let rank = subfields[..=k].iter().filter(|s| s.0 == code).count();
+    let n = subfields.iter().filter(|s| s.0 == code).count();
+    body.lines.iter().any(|line| line.lhs.as_ref().is_some_and(|lhs| lhs.matches(code, rank, n)))
 }
 
 /// Builds a data field from the body; `None` if it has no subfield.
@@ -161,7 +205,7 @@ fn render(value: &Value, ctx: Ctx) -> String {
             Piece::Expr(expr) => eval(expr, ctx).join(" "),
         })
         .collect();
-    funcs(vec![text], &value.funcs, ctx.tables).concat()
+    funcs(vec![text], &value.funcs, ctx).concat()
 }
 
 fn eval(expr: &Expr, ctx: Ctx) -> Vec<String> {
@@ -171,7 +215,7 @@ fn eval(expr: &Expr, ctx: Ctx) -> Vec<String> {
             *value = value.chars().skip(start).take(end + 1 - start.min(end + 1)).collect();
         }
     }
-    funcs(values, &expr.funcs, ctx.tables)
+    funcs(values, &expr.funcs, ctx)
 }
 
 /// The values of `operand`. With `any`, a subfield or path without an
@@ -189,7 +233,10 @@ fn operand(operand: &Operand, ctx: Ctx, any: bool) -> Vec<String> {
             _ => Vec::new(),
         },
         Operand::Sub(code, idx) => match ctx.field {
-            Some(field) => pick(field.subfields(*code).map(str::to_string).collect(), rank(*idx)),
+            Some(field) => {
+                read(ctx, field, Some(*code));
+                pick(field.subfields(*code).map(str::to_string).collect(), rank(*idx))
+            }
             None => Vec::new(),
         },
         Operand::Path { tags, field, code, sub } => {
@@ -197,6 +244,7 @@ fn operand(operand: &Operand, ctx: Ctx, any: bool) -> Vec<String> {
                 .filter(|f| tags.iter().any(|pat| pat.matches(*f.tag())))
                 .collect();
             pick(fields, rank(*field)).into_iter()
+                .inspect(|f| read(ctx, f, *code))
                 .flat_map(|f| match code {
                     Some(code) => pick(f.subfields(*code).map(str::to_string).collect(), rank(*sub)),
                     None => vec![field_value(f)],
@@ -235,7 +283,8 @@ fn field_value(field: &Field) -> String {
 const NSB: char = '\u{98}';
 const NSE: char = '\u{9c}';
 
-fn funcs(mut values: Vec<String>, funcs: &[Func], tables: &[Table]) -> Vec<String> {
+fn funcs(mut values: Vec<String>, funcs: &[Func], ctx: Ctx) -> Vec<String> {
+    let tables = ctx.tables;
     for func in funcs {
         values = match func {
             Func::StripNsb => values.into_iter().map(|v| v.replace([NSB, NSE], "")).collect(),
@@ -252,6 +301,12 @@ fn funcs(mut values: Vec<String>, funcs: &[Func], tables: &[Table]) -> Vec<Strin
             Func::Table(table, column) => values.into_iter()
                 .filter_map(|v| {
                     let table = &tables[*table];
+                    if let Some(report) = ctx.report
+                        && table.default.is_none()
+                        && !table.entries.contains_key(&v)
+                    {
+                        report.borrow_mut().table_misses.push((table.name.clone(), v.clone()));
+                    }
                     table.entries.get(&v).or(table.default.as_ref()).and_then(|columns| columns.get(column - 1)).cloned()
                 })
                 .collect(),
