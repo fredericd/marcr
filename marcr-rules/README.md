@@ -22,7 +22,8 @@ marcr-rules eval -r my.rules corpus/unimarc.mrc corpus/marc21.mrc --show 245,300
 the same `-d`, `-s`, `-o` and `-j` options as `marcr` and runs on all
 cores. `eval` converts each record of the first file and compares it, tag
 by tag, with the record of the second file that has the same 001; `--show`
-prints the differences for some tags.
+prints the differences for some tags. With `--pairs FILE`, records are
+paired by the lines `SOURCE_001 EXPECTED_001` of FILE instead.
 
 ## Library usage
 
@@ -206,5 +207,21 @@ corpus/sample.sh 50 k m -x corpus/ppn.txt >> corpus/ppn.txt   # 50 more maps and
 ```
 
 `sample.sh` picks random PPNs by type of document from the Sudoc SRU
-server. The records themselves are not part of the repository nor of
-the published crate.
+server.
+
+To convert MARC21 to UNIMARC, the source is native MARC21 records of the
+Library of Congress, not the Sudoc's own conversion: 1,800 control
+numbers in `lc.txt` and 419 in `lc-test.txt`, of all types of documents.
+Those with an ISBN or ISSN found in the Sudoc are paired with its
+UNIMARC record in `lc-pairs.txt` (176) and `lc-test-pairs.txt` (47).
+
+```sh
+corpus/fetch-lc.sh                   # lc.mrc (LC SRU server)
+corpus/pair.sh corpus/lc.mrc > corpus/lc-pairs.txt
+cut -d' ' -f2 corpus/lc-pairs.txt > ppn-lc.txt
+corpus/fetch.sh ppn-lc.txt lc        # unimarc-lc.mrc, marc21-lc.mrc
+corpus/sample-lc.sh 50 dc.subject=maps -x corpus/lc.txt >> corpus/lc.txt
+```
+
+The records themselves are not part of the repository nor of the
+published crate.

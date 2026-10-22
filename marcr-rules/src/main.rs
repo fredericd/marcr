@@ -76,6 +76,10 @@ enum Command {
         /// Number of differences shown per tag
         #[arg(long, value_name = "N", default_value_t = 5)]
         examples: usize,
+        /// Pairs records listed in FILE (lines "SOURCE_001 EXPECTED_001")
+        /// instead of by equal 001
+        #[arg(long, value_name = "FILE")]
+        pairs: Option<PathBuf>,
         source: PathBuf,
         expected: PathBuf,
     },
@@ -100,8 +104,8 @@ fn main() -> Result<ExitCode, Box<dyn Error>> {
         Command::Convert { rules, deserialize, serialize, output, jobs, files } => {
             convert(&load(&rules)?, deserialize.into(), serialize.into(), output, jobs, &files)
         }
-        Command::Eval { rules, deserialize, show, examples, source, expected } => {
-            eval(&load(&rules)?, deserialize.into(), &show, examples, &source, &expected)?;
+        Command::Eval { rules, deserialize, show, examples, pairs, source, expected } => {
+            eval(&load(&rules)?, deserialize.into(), &show, examples, pairs.as_ref(), &source, &expected)?;
             Ok(ExitCode::SUCCESS)
         }
         Command::List => {
@@ -173,9 +177,18 @@ fn eval(
     format: Format,
     show: &[String],
     examples: usize,
+    pairs: Option<&PathBuf>,
     source: &PathBuf,
     expected: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
+    let links: HashMap<String, String> = match pairs {
+        Some(path) => std::fs::read_to_string(path)?
+            .lines()
+            .filter_map(|line| line.split_once(char::is_whitespace))
+            .map(|(a, b)| (a.to_string(), b.trim().to_string()))
+            .collect(),
+        None => HashMap::new(),
+    };
     let read = |path: &PathBuf| -> Result<Vec<Record>, Box<dyn Error>> {
         let reader = Reader::new(format, BufReader::new(File::open(path)?));
         Ok(reader.filter_map(Result::ok).collect())
@@ -190,7 +203,8 @@ fn eval(
     let mut stats: BTreeMap<u16, TagStats> = BTreeMap::new();
     let (mut pairs, mut identical) = (0, 0);
     for record in read(source)? {
-        let Some((id, expected)) = id(&record).and_then(|id| expected.get(&id).map(|e| (id, e))) else {
+        let key = |id: String| if links.is_empty() { Some(id) } else { links.get(&id).cloned() };
+        let Some((id, expected)) = id(&record).and_then(|id| key(id.clone()).and_then(|k| expected.get(&k)).map(|e| (id, e))) else {
             continue;
         };
         pairs += 1;
