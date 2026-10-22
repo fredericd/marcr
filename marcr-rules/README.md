@@ -33,16 +33,73 @@ keys missing from tables (unless the table has a `*` entry). A field or subfield
 
 ## Library usage
 
+`Rules::apply` takes a [marcr](https://crates.io/crates/marcr) record
+and returns a new one. Records do not depend on a serialization format:
+read them with marcr in any format, convert them, and write them in any
+other.
+
+One record, from MARC21 in MARCXML to UNIMARC in ISO 2709:
+
 ```rust
+use marcr::Format;
 use marcr_rules::Rules;
 
-let rules = Rules::builtin("unimarc-to-marc21").unwrap(); // or Rules::from_file(path)?
-let marc21 = rules.apply(&unimarc_record);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let xml = r#"<record xmlns="http://www.loc.gov/MARC21/slim">
+      <leader>00000cam a2200000 i 4500</leader>
+      <controlfield tag="001">21587332</controlfield>
+      <controlfield tag="008">200526s2021    nyu           001 0 eng  </controlfield>
+      <datafield tag="100" ind1="1" ind2=" ">
+        <subfield code="a">Gioia, Ted,</subfield>
+        <subfield code="e">author.</subfield>
+      </datafield>
+      <datafield tag="245" ind1="1" ind2="4">
+        <subfield code="a">The history of jazz /</subfield>
+        <subfield code="c">Ted Gioia.</subfield>
+      </datafield>
+    </record>"#;
+
+    let rules = Rules::builtin("marc21-to-unimarc").unwrap(); // or Rules::from_file(path)?
+    let marc21 = Format::Marcxml.deserialize(xml.as_bytes())?;
+    let unimarc = rules.apply(&marc21);
+    std::fs::write("notice.mrc", Format::Iso2709.serialize(&unimarc)?)?;
+    print!("{}", String::from_utf8(Format::Text.serialize(&unimarc)?)?);
+    Ok(())
+}
 ```
 
-`Rules::apply` takes a record and returns a new one: use it as the
-`process` closure of `marcr::parallel::convert` to convert on all cores.
-`Rules::apply_with_report` also returns what the rules leave out.
+A whole file, on all cores, with what the rules leave out reported on
+the way (`Rules::apply` alone is enough otherwise):
+
+```rust
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
+use std::sync::Mutex;
+
+use marcr::{Format, Reader, Writer};
+use marcr_rules::Rules;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let rules = Rules::from_file("my.rules")?;
+    let reader = Reader::new(Format::Iso2709, BufReader::new(File::open("marc21.mrc")?));
+    let mut writer = Writer::new(Format::Marcxml, BufWriter::new(File::create("unimarc.xml")?));
+    let left_out = Mutex::new(Vec::new()); // tags of the fields no rule converts
+
+    let stats = marcr::parallel::convert(
+        reader,
+        &mut writer,
+        |record| {
+            let (converted, report) = rules.apply_with_report(&record);
+            left_out.lock().unwrap().extend(report.unconverted_fields);
+            Some(converted)
+        },
+        |number, error| eprintln!("record {number} skipped: {error}"),
+    )?;
+    writer.finish()?;
+    println!("{} records converted, {} fields left out", stats.written, left_out.lock().unwrap().len());
+    Ok(())
+}
+```
 
 ## The language
 
