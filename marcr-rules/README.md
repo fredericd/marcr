@@ -147,7 +147,9 @@ A value is a template string, `"..."` or `'...'` (`\\`, `\"`, `\'`,
 `'\.$'`), where `{expression}`
 is replaced by its result (`{{` and `}}` for literal braces), or a single
 `{expression}`. Functions after the value apply to the whole result:
-`$a -> $a | replace('-', '')`.
+`$a -> $a | replace('-', '')`. Texts are compared and produced as they
+are, without Unicode normalization: write literals and table values in
+the form of the records (decomposed, NFD, for the Sudoc).
 
 Expressions: `operand[/positions][|function]...`
 

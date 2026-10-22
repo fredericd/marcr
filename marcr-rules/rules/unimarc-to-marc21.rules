@@ -1,6 +1,9 @@
 # UNIMARC to MARC21, written after the conversion of the Sudoc (Abes) and
 # evaluated on pairs of Sudoc records (see corpus/ in the marcr-rules
 # repository).
+#
+# Literal texts are written decomposed (NFD), as in Sudoc records: an
+# "è" typed as one character would not match.
 
 rules "UNIMARC to MARC21 (Sudoc)"
 version 0.1
@@ -123,6 +126,7 @@ table ind264 {
 table datetype {
   a = c
   b = d
+  c = u
   d = s
   e = r
   f = q
@@ -292,6 +296,343 @@ table level {
   m = "   s"
 }
 
+# 106 $a/0 -> 008/23 (books): form of item
+table itemform {
+  h = " "
+  i = " "
+  z = " "
+}
+
+# 115 $a/9 -> 008/34 (videos): technique
+table technique {
+  b = l
+  x = n
+}
+
+# 120 $a/3 -> 008/18 (maps): relief
+table relief {
+  " " = "|"
+  x = " "
+}
+
+# 120 $a/7-8 -> 008/22-23 (maps): projection
+table projection {
+  u = " "
+  x = " "
+}
+
+# 121 $a/8 -> 008/25 (maps): type of cartographic material
+table maptype {
+  b = c
+  c = e
+  e = g
+}
+
+# 105 $a/11 -> 008/31 (maps): index
+table mapindex {
+  y = 0
+}
+
+# 121 $a/5 -> 008/33 (maps): special format characteristics
+table mapformat {
+  b = z
+  u = " "
+}
+
+# 125 $a/0 -> 008/20 (scores, sound recordings): format of music
+table scoreformat {
+  h = "|"
+  l = "|"
+  x = "|"
+}
+
+# 126 $a/7-10 -> 008/24-27 (sound recordings): accompanying matter
+table accompanying {
+  j = z
+}
+
+# 125 $b/0 -> 008/30 (sound recordings): literary text
+table literary {
+  a = p
+  b = d
+  c = f
+  d = h
+  e = l
+  j = e
+  k = g
+  n = t
+  p = j
+  r = k
+  s = o
+}
+
+# 116 $a/0 -> 008/33 (images): type of visual material
+table imagetype {
+  b = "|"
+  d = c
+  f = "|"
+  h = i
+  i = "|"
+  k = l
+  z = k
+}
+
+# 110 $a/1 -> 008/18 (serials): frequency
+table frequency {
+  a = d
+  c = w
+  e = s
+  f = m
+  g = b
+  h = q
+  i = t
+  j = f
+  k = a
+  y = " "
+}
+
+# 110 $a/2 -> 008/19 (serials): regularity
+table regularity {
+  a = r
+  b = n
+  y = x
+}
+
+# 100 $a/17 -> 008/20 (serials), as Abes fills it
+table serialcentre {
+  k = " "
+  m = " "
+  u = z
+  "|" = " "
+}
+
+# 110 $a/0 -> 008/21 (serials): type of continuing resource
+table serialtype {
+  a = p
+  b = m
+  c = n
+  j = i
+  m = g
+  n = s
+}
+
+# 110 $a/3-4 -> 008/24-25 (serials): nature of contents
+table serialcontents {
+  "#" = "|"
+  g = r
+  i = s
+  z = " "
+}
+
+# 110 $a/9 -> 008/26-27 (serials)
+table conference {
+  u = "|"
+  x = " "
+  y = " "
+  z = "|"
+}
+
+# 124 $b/0 -> 007/1 (maps): specific material designation
+table mapform {
+  a = d
+  d = j
+  i = y
+  j = "|"
+}
+
+# 120 $a/0 -> 007/3 (maps): colour
+table mapcolour {
+  b = c
+}
+
+# 121 $a/4-5 -> 007/4, 007/6 (maps): physical medium, reproduction
+table mapmedium {
+  b = z
+  j = z
+}
+
+# 115 $a/0 -> 007/0 (videos): category of material
+table videotype {
+  a = m
+  b = g
+  c = v
+}
+
+# 115 $a/15 -> 007/1 (videos): specific material designation
+table videoformat {
+  b = d
+  c = f
+  x = "|"
+}
+
+# 115 $a/4 -> 007/3 (videos): colour
+table videocolour {
+  a = b
+  b = a
+  c = m
+}
+
+# 115 $a/16 -> 007/4 (videos): videorecording format
+table videovideo {
+  k = v
+}
+
+# 115 $a/5-6, $b/5 -> 007/5-6, 007/8 (videos): sound
+table videosound {
+  b = s
+  x = n
+  y = " "
+}
+
+# 126 $a/0 -> 007/1 (sound recordings): specific material designation
+table sounddisc {
+  a = d
+  c = s
+}
+
+# 126 $a/1 -> 007/3 (sound recordings): speed
+table soundspeed {
+  g = f
+  k = l
+}
+
+# 126 $a/2 -> 007/4 (sound recordings): playback channels
+table soundchannels {
+  a = m
+  b = s
+}
+
+# 126 $a/3-6, $b/0-2 -> 007/5-10 (sound recordings)
+table soundcoded {
+  x = n
+}
+
+# 126 $a/3, $b/0 -> 007/5, 007/8 (sound recordings): groove, kind of disc
+table soundgroove {
+  b = m
+  x = n
+}
+
+# 126 $a/5 -> 007/6 (sound recordings): dimensions
+table soundsize {
+  b = o
+  d = l
+  x = n
+}
+
+# 126 $b/1 -> 007/9 (sound recordings): kind of material
+table soundmaterial {
+  d = p
+  e = m
+  h = p
+  x = n
+}
+
+# 126 $b/2 -> 007/10 (sound recordings): kind of cutting
+table soundcutting {
+  b = h
+  x = n
+}
+
+# 126 $a/14 -> 007/12 (sound recordings): capture technique
+table soundcapture {
+  d = e
+  f = c
+}
+
+# 126 $a/13 -> 007/11 (sound recordings): special playback
+table soundplayback {
+  b = e
+  c = d
+}
+
+# 116 $a/0 -> 007/1 (images): specific material designation
+table imagematerial {
+  a = c
+  b = d
+  d = f
+  f = h
+  h = i
+  i = j
+  k = l
+}
+
+# 116 $a/1-3 -> 007/3-5 (images): colour, support
+table imagecolour {
+  d = h
+  i = o
+}
+
+# 510 $z -> 246 (parallel titles): language names, in French as Abes
+# gives them (ISO 639-2 French names, decomposed: NFD)
+# shortcut: 55 common languages of about 480, add the others when met
+table langname {
+  fre = français
+  eng = anglais
+  ger = allemand
+  spa = "espagnol ; castillan"
+  ita = italien
+  por = portugais
+  dut = "néerlandais ; flamand"
+  lat = latin
+  grc = grec ancien (jusqu'à 1453)
+  gre = grec moderne (après 1453)
+  rus = russe
+  pol = polonais
+  cze = tchèque
+  slo = slovaque
+  slv = slovène
+  hrv = croate
+  srp = serbe
+  bul = bulgare
+  ukr = ukrainien
+  rum = "roumain ; moldave"
+  hun = hongrois
+  fin = finnois
+  est = estonien
+  lav = letton
+  lit = lituanien
+  dan = danois
+  swe = suédois
+  nor = norvégien
+  ice = islandais
+  gle = irlandais
+  wel = gallois
+  bre = breton
+  baq = basque
+  cat = "catalan ; valencien"
+  oci = occitan (après 1500)
+  ltz = luxembourgeois
+  tur = turc
+  ara = arabe
+  heb = hébreu
+  per = persan
+  arm = arménien
+  geo = géorgien
+  alb = albanais
+  hin = hindi
+  san = sanskrit
+  chi = chinois
+  jpn = japonais
+  kor = coréen
+  vie = vietnamien
+  tha = thaï
+  ind = indonésien
+  epo = espéranto
+  yid = yiddish
+  mul = multilingue
+  und = indéterminée
+}
+
+# 123 indicator 1 -> 034 indicator 1 (type of scale)
+table ind034 {
+  0 = 0
+  1 = 1
+  2 = 3
+  3 = 3
+  4 = 0
+}
+
 # ---- Leader and control fields --------------------------------------
 
 record -> LDR "{LDR/0-4}{LDR/5}{LDR/6|table(type)}{LDR/7} a2200000 i 4500"
@@ -300,11 +641,26 @@ record when 801 -> 040 [##] { -> $a "ABES" ; -> $b "fre" ; -> $e "AFNOR" }
 # 008: dates and country, then the positions of the type of material,
 # then language. Date 2 is "||||" for a single date (d), its unknown
 # digits are "u". Illustrations are "||||" when 105 is not filled in.
-record when LDR~^.{6}[at] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{105a/0-4|replace('^y   \|$', '|||||')|replace('^(.{4}).$', '$1')|tr(illustrations)}{100a/17|tr(audience)}{106a/0|default(' ')}{105a/4-7|tr(contents)}{100a/20|tr(government)}{105a/8-10} {105a/11|tr(literature)}{105a/12|tr(biography)}{101a} d"
-record when LDR~^.{6}l -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}||||{100a/17|tr(audience)}|||{135a/0|tr(filetype)|default('|')} {100a/20|tr(government)}||||||{101a} d"
-record when LDR~^.{6}g -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{115a/1-3}|{100a/17|tr(audience)}|||||{100a/20|tr(government)}    {115a/0|tr(visual)}l{101a} d"
+record when LDR~^.{6}[abt][^s] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{105a/0-4|replace('^y   \|$', '|||||')|replace('^(.{4}).$', '$1')|tr(illustrations)}{100a/17|tr(audience)}{106a/0|tr(itemform)|default('|')}{105a/4-7|tr(contents)}{100a/20|tr(government)}{105a/8-10} {105a/11|tr(literature)}{105a/12|tr(biography)}{101a} d"
+# Maps
+record when LDR~^.{6}[ef] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{120a/3|tr(relief)|default('|')}{120a/3|replace('^[^ ]$', '   ')|replace('^ $', '|||')|default('|||')}{120a/7-8|tr(projection)|default('||')}|{121a/8|tr(maptype)|default('|')}||{100a/20|tr(government)}  {105a/11|tr(mapindex)|default('|')}|{121a/5|tr(mapformat)|default('|')}|{101a} d"
+# Scores: form of composition (MARC codes only, others "zz"), format
+record when LDR~^.{6}[cd] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{128a/0-1|replace('^(ai|ar|in|li|pf)$', 'zz')|default('||')}{125a/0|tr(scoreformat)|default('|')}|{100a/17|tr(audience)}{106a/0|default('|')}|||||||||||{101a} d"
+# Sound recordings: accompanying matter (126), literary text (125 $b)
+record when LDR~^.{6}[ij] -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{128a/0-1|replace('^(ai|ar|in|li|pf)$', 'zz')|default('||')}{125a/0|tr(scoreformat)|default('|')}|{100a/17|tr(audience)}|{126a/7-10|tr(accompanying)|default('||||')}{126a/7|replace('^\|$', '||')|replace('^[^|]$', '  ')|default('||')}{125b/0|tr(literary)|replace('^(.)$', '$1 ')|default('||')}|||{101a} d"
+# Images: type of material (116)
+record when LDR~^.{6}k -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}---|{100a/17|tr(audience)}|||||{100a/20|tr(government)}    {116a/0|tr(imagetype)|default(' ')}|{101a} d"
+# Serials (110): frequency, regularity, type, contents
+record when LDR~^.{6}as -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{110a/1|tr(frequency)|default('|')}{110a/2|tr(regularity)|default('|')}{100a/17|tr(serialcentre)|default('z')}{110a/0|tr(serialtype)|default('|')}{106a/0|default('|')}{106a/0|default('|')}{110a/3|tr(serialcontents)|default('|')}{110a/4|tr(serialcontents)|default('|')}{110a/9|tr(conference)|default('|')}{110a/9|tr(conference)|default('|')}{100a/20|tr(government)}|||||0{101a} d"
+record when LDR~^.{6}l -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}||||{100a/17|tr(audience)}|||{135a/0|tr(filetype)|default('|')} {100a/20|tr(government)}||||||{101a} d"
+record when LDR~^.{6}g -> 008 "{100a/2-7}{100a/8|table(datetype)}{100a/9-12|replace(' ', 'u')}{100a/8-16|replace('^d.{4} {4}$', '||||')|replace('^.{5}(.{4})$', '$1')|replace(' ', 'u')}{102a|table(country)|default('xx ')}{115a/1-3|replace('\|', '-')|default('---')}|{100a/17|tr(audience)}|||||{100a/20|tr(government)}    {115a/0|tr(visual)}{115a/9|tr(technique)|default('|')}{101a} d"
 
 # 007 of electronic resources, from 135 (bit depth always "---")
+# 007 of maps, videos, sound recordings and images, from their coded fields
+record when LDR~^.{6}[ef] -> 007 "a{124b/0|tr(mapform)|default('|')}|{120a/0|tr(mapcolour)|default('|')}{121a/4|tr(mapmedium)|default('|')}u{121a/5|tr(mapmedium)|default('|')}n"
+record when LDR~^.{6}g when 115 -> 007 "{115a/0|tr(videotype)}{115a/15|tr(videoformat)}|{115a/4|tr(videocolour)}{115a/16|tr(videovideo)}{115a/5|tr(videosound)}{115a/6|tr(videosound)}{115a/7}{115b/5|tr(videosound)|default('|')}"
+record when LDR~^.{6}[ij] when 126 -> 007 "s{126a/0|tr(sounddisc)}|{126a/1|tr(soundspeed)}{126a/2|tr(soundchannels)}{126a/3|tr(soundgroove)}{126a/5|tr(soundsize)}{126a/6|tr(soundcoded)}{126b/0|tr(soundgroove)|default('|')}{126b/1|tr(soundmaterial)|default('|')}{126b/2|tr(soundcutting)|default('|')}{126a/14|tr(soundcapture)}{126a/13|tr(soundplayback)}"
+record when LDR~^.{6}k when 116 -> 007 "k{116a/0|tr(imagematerial)}|{116a/3|tr(imagecolour)}{116a/1|tr(imagecolour)}{116a/2|tr(imagecolour)}"
 record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|tr(electronic)|default('uuu')}---{135a/8-12|tr(electronic)|default('uuuuu')}"
 
 001 -> 001
@@ -319,12 +675,18 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $z -> $z | replace('-', '')
 }
 035 -> 035 [##] { $a -> $a ; $z -> $z }
+123 -> 034 [{@ind1|table(ind034)}#] { $a -> $a ; $b -> $b ; $c -> $c ; $d -> $d ; $e -> $e ; $f -> $f ; $g -> $g }
+# Abes copies 128 as is to 047, blanks as "#": here the form of composition
+# goes to 047, the instruments and voices to 048
+128 when $a -> 047 [##] { $a -> $a | trim }
+128 when $b -> 048 [##] { $b -> $a ; $c -> $b }
+128 when !$b when $c -> 048 [##] { $c -> $b }
 011 -> 022 [{@ind1}#] { $a -> $a ; $f -> $l ; $y -> $y ; $z -> $z }
 071 -> 028 [{@ind1}{@ind2}] { $a -> $a ; $b -> $b ; order $a $b }
 013 -> 024 [2#] { $a -> $a ; $b -> += " ({|replace('\.$', '')})" ; $d -> $c }
 017 -> 024 [7#] { $a -> $a ; $2 -> $2 }
 029 when $b -> 024 [7#] { $b -> $a ; -> $2 "FRnnt" ; order $a $2 }
-029 when $e -> 024 [8#] { $e -> $a ; -> $q "Thèse d'exercice" ; order $a $q }
+029 when $e -> 024 [8#] { $e -> $a ; -> $q "Thèse d'exercice" ; order $a $q }
 073 -> 024 [3{@ind2|table(ind024)}] { $a -> $a ; $b -> += " ({|replace('\.$', '')})" }
 101 -> 041 [{@ind1|table(ind041)}#] {
   $a -> $a ; $d -> $b ; $j -> $b ; $c -> $h ; $i -> $g ; $h -> $e ; $e -> $f
@@ -344,29 +706,51 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 200 -> 245 [{700,710,720|exists(1,0)} {$a|nonfiling}] {
   $a[1] -> $a | strip_nsb
   $a[2..] -> $b {|strip_nsb} before " ;"
+  # Parallel titles begin with "= " in the Sudoc
+  $d[1] -> $b {|strip_nsb|replace('^= ?', '')} before " ="
+  $d[2..] -> += " = {|strip_nsb|replace('^= ?', '')}"
   $e -> $b before " :"
   $f[1] -> $c before " /"
   $f[2..] -> += " ; {}"
   $g -> += " ; {}"
   $h -> $n before "."
-  $i -> $p before "."
+  $i -> $p before "," after $n before "."
+  # Abes adds the period even after an abbreviation ("comp.."): not kept
   end "."
 }
 # A final period, unless the statement ends with "]" or "."
 205 -> 250 [##] { $a -> $a | replace('([^\].])$', '$1.') }
 207 -> 362 [##] { $a -> $a }
 230 -> 256 [##] { $a -> $a ; end "." }
+# Publication (210, older records) -> 260; manufacture in parentheses
+# A final period, unless the date ends with "]", ")", "?", "-" or ".".
+# A later publisher (indicator 1 = 1) is not kept.
+210 when !@ind1=1 when !$e -> 260 [##] {
+  $a -> $a before " ;"
+  $b -> += " ({})"
+  $c -> $b before " :"
+  $d -> $c {|replace('([^\]?.-])$', '$1.')} before ","
+}
+210 when !@ind1=1 when $e -> 260 [##] {
+  $a -> $a before " ;"
+  $b -> += " ({})"
+  $c -> $b before " :"
+  $d -> $c before ","
+  $e -> $e "({}{$g|exists('', ')')}"
+  $g -> $f "{})" before " :"
+}
 214 -> 264 [#{@ind2|table(ind264)}] {
   $a -> $a before " ;"
   $c -> $b before " :"
   $d -> $c before "," after $b
   end "."
 }
+# Each element ends with a period, unless it ends with ")", "]", "°" or "."
 215 -> 300 [##] {
-  $a -> $a
-  $c -> $b before " :"
-  $d -> $c "{}." before ". ;" after $b before " ;"
-  $e -> $e before ". +" after $b before " +"
+  $a -> $a | replace('([^.)\]°])$', '$1.')
+  $c -> $b {|replace('([^.)\]°])$', '$1.')} before " :"
+  $d -> $c {|replace('([^.)\]°])$', '$1.')} before " ;"
+  $e -> $e {|replace('([^.)\]°])$', '$1.')} before " +"
 }
 # The volume number of a subseries ($i) is not kept
 225 when !$i -> 490 [{@ind1|table(ind490)}#] {
@@ -382,9 +766,11 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 
 # ---- Notes ----------------------------------------------------------
 
-# General notes
-300 301 302 304 305 306 307 308 312 333 -> 500 [##] { $a -> $a ; end "." }
-320 -> 504 [##] { $a -> $a ; end "." }
+# General notes: a final period, unless the note ends with ".", ")", "]",
+# "?" or "!"
+300 301 302 304 305 306 307 308 312 333 -> 500 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+315 -> 507 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
+320 -> 504 [##] { $a -> $a | replace('([^.)\]?!])$', '$1.') }
 327 -> 505 [{@ind1|table(ind505)}#] { $a[1] -> $a ; $a[2..] -> += " -- {}" }
 328 -> 502 [##] { $b -> $a ; $c -> += " : {}" ; $e -> += " : {}" ; $d -> += " : {}" }
 330 -> 520 [##] { $a -> $a ; $2 -> $c ; end "." }
@@ -530,7 +916,20 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
   $d[1] -> $d "{$j}-{|replace('^(..)(..)$', '$1-$2')}"
   order $a $d $g
 }
-517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b }
+517 -> 246 [13] { $a -> $a | strip_nsb ; $e -> $b before " :" }
+518 532 -> 246 [13] like 517
+512 -> 246 [14] like 517
+513 -> 246 [15] like 517
+515 -> 246 [17] like 517
+516 -> 246 [18] like 517
+# Parallel titles, with the name of their language
+510 -> 246 [11] {
+  $a -> $a | strip_nsb
+  $e -> $b before " :"
+  $h -> $n before "."
+  $i -> $p before "," after $n before "."
+  $z -> += ", {|table(langname)}"
+}
 530 -> 222 [#0] { $a -> $a | strip_nsb ; $b -> $b }
 541 -> 242 [1{$a|nonfiling}] {
   $a -> $a | strip_nsb
@@ -653,6 +1052,9 @@ record when LDR~^.{6}l -> 007 "c{135a/1|tr(electronic)|default('u')}|{135a/2-4|t
 }
 711 -> 710 [2#] like 710
 712 -> 710 [2#] like 710
+
+# Place of publication or performance
+620 -> 752 [##] { $a -> $a ; $b -> $b ; $c -> $c ; $d -> $d ; $e -> $f }
 
 # ---- Electronic location --------------------------------------------
 
