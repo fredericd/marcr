@@ -774,6 +774,65 @@ table nbsource {
   can = CA
 }
 
+# MARC language code -> ISO 639-2/B (101): obsolete codes and ISO 639-2/T
+# codes to their current ISO 639-2/B code, other codes unchanged.
+table lang {
+  * = {}
+  # Obsolete codes
+  ajm = spa
+  cam = khm
+  esk = iku
+  esp = epo
+  eth = gez
+  far = fao
+  fri = fry
+  gae = gla
+  gag = glg
+  gal = orm
+  gua = grn
+  int = ina
+  iri = gle
+  kus = kos
+  lan = oci
+  lap = smi
+  max = glv
+  mla = mlg
+  mol = rum
+  sao = smo
+  scc = srp
+  scr = hrv
+  sho = sna
+  snh = sin
+  sso = sot
+  swz = ssw
+  tag = tgl
+  taj = tgk
+  tar = tat
+  tru = chk
+  tsw = tsn
+  # ISO 639-2/T
+  bod = tib
+  ces = cze
+  cym = wel
+  deu = ger
+  ell = gre
+  eus = baq
+  fas = per
+  fra = fre
+  hye = arm
+  isl = ice
+  kat = geo
+  mkd = mac
+  mri = mao
+  msa = may
+  mya = bur
+  nld = dut
+  ron = rum
+  slk = slo
+  sqi = alb
+  zho = chi
+}
+
 # Organization code -> country (801 $a)
 table orgcountry {
   DLC = US
@@ -1236,17 +1295,17 @@ record when LDR~^.{6}p -> 100 [##] { -> $a "{008/0-5|replace('^([0-2])', '20$1')
 
 # 101 language: 041 with MARC codes (not those with a $2), else 008/35-37
 041 when !$2 -> 101 [{@ind1|replace(' ', '0')}#] {
-  $a -> $a
-  $d -> $a
-  $k -> $b
-  $h -> $c
-  $b -> $d
-  $f -> $e
-  $e -> $h
-  $g -> $i
-  $j -> $j
+  $a -> $a {|table(lang)}
+  $d -> $a {|table(lang)}
+  $k -> $b {|table(lang)}
+  $h -> $c {|table(lang)}
+  $b -> $d {|table(lang)}
+  $f -> $e {|table(lang)}
+  $e -> $h {|table(lang)}
+  $g -> $i {|table(lang)}
+  $j -> $j {|table(lang)}
 }
-record when !041 -> 101 [0#] { -> $a "{008/35-37|trim|replace('^\|+$', '')}" }
+record when !041 -> 101 [0#] { -> $a "{008/35-37|trim|replace('^\|+$', '')|table(lang)}" }
 
 record -> 102 [##] { -> $a "{008/15-17|trim|table(country)}" }
 

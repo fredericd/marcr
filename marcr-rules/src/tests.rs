@@ -205,13 +205,18 @@ fn tables_header_and_defaults() {
           y = " "
           " " = "#"
         }
+        table codes {
+          scr = hrv
+          * = {}
+        }
         101 -> 041 [##] { $a -> $a {|table(langs)}, $b {|table(langs, 2)} }
         105 -> 008 "{$a|tr(blanks)}"
+        102 -> 044 [##] { $a -> $a {|table(codes)} }
         "##,
     );
     assert_eq!((rules.name(), rules.version()), (Some("Test rules"), Some("1.2")));
-    let source = record(vec![vec!["101", "0 ", "a", "fre", "a", "xxx"], vec!["105", "  ", "a", "ay y"]]);
-    assert_eq!(lines(&rules.apply(&source)), ["008 a # ", "041 ## $aFrench $bfr, FR $aUnknown"]);
+    let source = record(vec![vec!["101", "0 ", "a", "fre", "a", "xxx"], vec!["102", "  ", "a", "scr", "a", "fre"], vec!["105", "  ", "a", "ay y"]]);
+    assert_eq!(lines(&rules.apply(&source)), ["008 a # ", "041 ## $aFrench $bfr, FR $aUnknown", "044 ## $ahrv $afre"]);
 }
 
 #[test]

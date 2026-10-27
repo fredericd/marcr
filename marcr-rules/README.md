@@ -124,14 +124,15 @@ table roles {                          # tables, before the rules using them
 ```
 table langs {
   fre = French, "fr, FR"      # key = value, value...
-  *   = Unknown               # value for a missing key (optional)
+  *   = Unknown               # value for a missing key (optional), {} for the key
 }
 ```
 
 One entry per line. Keys and values are trimmed; quote one that contains
 a comma. `{|table(langs)}` gives the first value column of the key,
-`{|table(langs, 2)}` the second. A missing key gives the `*` entry, or no
-value (the subfield is then not produced). An empty value stays empty.
+`{|table(langs, 2)}` the second. A missing key gives the `*` entry, where `{}`
+stands for the key (`* = {}` keeps it), or no value (the subfield is
+then not produced). An empty value stays empty.
 
 ### Rules
 

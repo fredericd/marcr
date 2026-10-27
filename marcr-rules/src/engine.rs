@@ -327,7 +327,11 @@ fn funcs(mut values: Vec<String>, funcs: &[Func], ctx: Ctx) -> Vec<String> {
                     {
                         report.borrow_mut().table_misses.push((table.name.clone(), v.clone()));
                     }
-                    table.entries.get(&v).or(table.default.as_ref()).and_then(|columns| columns.get(column - 1)).cloned()
+                    match table.entries.get(&v) {
+                        Some(columns) => columns.get(column - 1).cloned(),
+                        // `{}` in the `*` entry is the missing key
+                        None => table.default.as_ref().and_then(|columns| columns.get(column - 1)).map(|d| d.replace("{}", &v)),
+                    }
                 })
                 .collect(),
             Func::Tr(table) => values.into_iter()
