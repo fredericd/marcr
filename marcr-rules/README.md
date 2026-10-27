@@ -9,6 +9,25 @@ two formats and checked on records of the Library of Congress.
 A rules file is self-contained: header, tables and rules in a single
 text file, easy to share, read and compare between versions.
 
+Source: [github.com/fredericd/marcr](https://github.com/fredericd/marcr/tree/main/marcr-rules).
+API documentation: [docs.rs/marcr-rules](https://docs.rs/marcr-rules).
+
+## Built-in rules
+
+Two rules files come with the crate:
+
+- [`unimarc-to-marc21.rules`](https://github.com/fredericd/marcr/blob/main/marcr-rules/rules/unimarc-to-marc21.rules):
+  UNIMARC to MARC21, after the conversion of the Sudoc (Abes);
+- [`marc21-to-unimarc.rules`](https://github.com/fredericd/marcr/blob/main/marcr-rules/rules/marc21-to-unimarc.rules):
+  MARC21 to UNIMARC, checked on records of the Library of Congress.
+
+They can be used as they are (`-r unimarc-to-marc21`), and are meant to
+be the starting point of a conversion of your own: local fields, other
+cataloguing practices, other tables. Copy one with `marcr-rules show
+NAME > my.rules`, change it, and check the result on your records with
+`eval` and `coverage`. They are also the most complete examples of the
+language.
+
 ## Command-line usage
 
 ```sh
@@ -40,7 +59,7 @@ other.
 
 One record, from MARC21 in MARCXML to UNIMARC in ISO 2709:
 
-```rust
+```rust,no_run
 use marcr::Format;
 use marcr_rules::Rules;
 
@@ -71,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 A whole file, on all cores, with what the rules leave out reported on
 the way (`Rules::apply` alone is enough otherwise):
 
-```rust
+```rust,no_run
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::sync::Mutex;
@@ -105,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Structure
 
-```
+```text
 # A comment: `#` followed by a space, up to the end of the line.
 
 rules "UNIMARC to MARC21 (Sudoc)"     # header: name and version
@@ -121,7 +140,7 @@ table roles {                          # tables, before the rules using them
 
 ### Tables
 
-```
+```text
 table langs {
   fre = French, "fr, FR"      # key = value, value...
   *   = Unknown               # value for a missing key (optional), {} for the key
@@ -136,7 +155,7 @@ then not produced). An empty value stays empty.
 
 ### Rules
 
-```
+```text
 SOURCE [when CONDITION]... -> TARGET
 ```
 
@@ -150,7 +169,7 @@ record are sorted by tag; fields that no rule converts are dropped.
 
 The target is one of:
 
-```
+```text
 LDR "template"                  # the leader
 008 "template"                  # a control field (tag < 10)
 001                             # a control field, copying the value
@@ -169,7 +188,7 @@ indicators, the source field's are kept.
 
 ### Body
 
-```
+```text
 200 -> 245 [10] {
   $a[1]   -> $a | strip_nsb                 # first $a
   $a[2..] -> $b before " ;"                 # next $a, preceded by " ;"
@@ -214,7 +233,7 @@ Block statements:
 
 ### Common lines
 
-```
+```text
 common {
   $6 -> $6 | replace('^\d{3}-(\d\d).*$', 'a$1')
 }
@@ -263,7 +282,7 @@ by a space unless `join` is used.
 
 ### Conditions
 
-```
+```text
 606 when $2=rameau -> 650 [#7] { ... }
 606 when $2~^(lc|LC)$ -> 650 [#0] { ... }
 record when !856 -> ...

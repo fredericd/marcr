@@ -1,14 +1,5 @@
-//! Rule language to convert MARC records between formats, starting with
-//! UNIMARC to MARC21. A rules file is self-contained: header, tables and
-//! rules. See the README for the language.
-//!
-//! ```
-//! use marcr_rules::Rules;
-//!
-//! let rules = Rules::builtin("unimarc-to-marc21").unwrap();
-//! # let unimarc = marcr::Record::default();
-//! let marc21 = rules.apply(&unimarc);
-//! ```
+// The README holds the language reference: show it on docs.rs too
+#![doc = include_str!("../README.md")]
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -120,8 +111,11 @@ impl Report {
 /// (line 0 when the file could not be read).
 #[derive(Debug)]
 pub struct Error {
+    /// The rules file (`NAME.rules` for built-in rules).
     pub file: PathBuf,
+    /// The line, from 1 (0 when the file could not be read).
     pub line: usize,
+    /// What is wrong.
     pub message: String,
 }
 
