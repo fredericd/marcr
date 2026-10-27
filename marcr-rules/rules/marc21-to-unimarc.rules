@@ -763,15 +763,69 @@ table subjectsource {
   7 = ""
 }
 
-# 015 $2 -> country of the national bibliography (020 $a)
+# 015 $2 -> country of the national bibliography (020 $a): National
+# Bibliography Number Source Codes (loc.gov/standards/sourcelist), and ccb
 table nbsource {
+  abc = CO
+  abd = DO
+  abe = EC
+  abp = PE
+  abu = UY
+  anb = AU
+  ba = AD
+  bbe = BE
+  bbo = BO
+  bbr = BR
+  bc = CU
+  bccb = NL
+  bcl = CL
+  be = ES
+  bk = BG
+  bkck = CZ
+  bksk = SK
+  bl = LU
+  bm = MX
   bnb = GB
-  dnb = DE
-  nznb = NZ
+  bnc = ES
+  bne = ES
   bnf = FR
-  ccb = CN
-  sanb = ZA
+  bni = IT
+  bnm = MT
+  bnr = RO
+  bv = VE
   can = CA
+  ccb = CN
+  cnb = CZ
+  cncr = CR
+  cnsn = CN
+  db = DE
+  dbf = DK
+  dnb = DE
+  dnd = DK
+  eev = GR
+  gnb = GR
+  hb = HR
+  ib = IS
+  ipr = IE
+  jnb = JP
+  kktzm = JP
+  kl = RU
+  la = AR
+  lb = LI
+  ldb = BY
+  mnb = HU
+  nbf = NO
+  nznb = NZ
+  oeb = AT
+  pb = PL
+  sanb = ZA
+  sbf = SE
+  skl = FI
+  slb = SI
+  szb = CH
+  tnb = TW
+  ulk = UA
+  znb = ZW
 }
 
 # MARC language code -> ISO 639-2/B (101): obsolete codes and ISO 639-2/T
