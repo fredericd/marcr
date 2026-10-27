@@ -265,6 +265,7 @@ table country {
   bf = BS
   bg = BD
   bh = BZ
+  bi = IO
   bl = BR
   bm = BM
   bn = BA
@@ -274,9 +275,10 @@ table country {
   bs = BW
   bt = BT
   bu = BG
+  bv = BV
   bw = BY
   bx = BN
-  ca = CW
+  ca = BQ
   cau = US
   cb = KH
   cc = CN
@@ -290,6 +292,7 @@ table country {
   ck = CO
   cl = CL
   cm = CM
+  co = CW
   cou = US
   cq = KM
   cr = CR
@@ -322,10 +325,12 @@ table country {
   fm = FM
   fp = PF
   fr = FR
+  fs = TF
   ft = DJ
   gau = US
   gb = KI
   gd = GD
+  gg = GG
   gh = GH
   gi = GI
   gl = GL
@@ -339,7 +344,9 @@ table country {
   gv = GN
   gw = DE
   gy = GY
+  gz = PS
   hiu = US
+  hm = HM
   ho = HN
   ht = HT
   hu = HU
@@ -349,6 +356,7 @@ table country {
   ie = IE
   ii = IN
   ilu = US
+  im = IM
   inu = US
   io = ID
   iq = IQ
@@ -356,7 +364,10 @@ table country {
   is = IL
   it = IT
   iv = CI
+  iy = NT
   ja = JP
+  je = JE
+  ji = UM
   jm = JM
   jo = JO
   ke = KE
@@ -365,6 +376,7 @@ table country {
   ko = KR
   ksu = US
   ku = KW
+  kv = XK
   kyu = US
   kz = KZ
   lau = US
@@ -403,6 +415,7 @@ table country {
   mx = MX
   my = MY
   mz = MZ
+  na = AN
   nbu = US
   ncu = US
   ndu = US
@@ -426,14 +439,18 @@ table country {
   nuc = CA
   nvu = US
   nw = MP
+  nx = NF
   nyu = US
   nz = NZ
   ohu = US
   oku = US
   onc = CA
   oru = US
+  ot = YT
   pau = US
+  pc = PN
   pe = PE
+  pf = XX
   pg = GW
   ph = PH
   pic = CA
@@ -456,6 +473,7 @@ table country {
   ru = RU
   rw = RW
   sa = ZA
+  sc = BL
   scu = US
   sd = SS
   sdu = US
@@ -467,12 +485,14 @@ table country {
   sj = SD
   sl = SL
   sm = SM
+  sn = SX
   snc = CA
   so = SO
   sp = ES
   sq = SZ
   sr = SR
   ss = EH
+  st = MF
   stk = GB
   su = SA
   sw = SE
@@ -496,9 +516,11 @@ table country {
   txu = US
   tz = TZ
   ua = EG
+  uc = UM
   ug = UG
+  uik = GB
   un = UA
-  us = US
+  up = UM
   utu = US
   uv = BF
   uy = UY
@@ -517,6 +539,7 @@ table country {
   wf = WF
   wiu = US
   wj = PS
+  wk = UM
   wlk = GB
   ws = WS
   wvu = US
@@ -527,6 +550,7 @@ table country {
   xd = KN
   xe = MH
   xf = UM
+  xga = AU
   xh = NU
   xj = SH
   xk = LC
@@ -536,8 +560,10 @@ table country {
   xna = AU
   xo = SK
   xoa = AU
+  xp = XX
   xr = CZ
   xra = AU
+  xs = GS
   xv = SI
   xx = XX
   xxc = CA
@@ -546,11 +572,54 @@ table country {
   ye = YE
   ykc = CA
   za = ZM
-  # Former countries
-  xxr = SU
+  # Not MARC codes, found in the records
+  us = US
+  xx# = XX
+  # Obsolete codes
+  ac = AU
+  air = AM
+  ajr = AZ
+  bwr = BY
+  cn = CA
+  cp = KI
   cs = CS
+  cz = PA
+  err = EE
   ge = DD
+  gn = KI
+  gsr = GE
+  hk = HK
+  iu = XX
+  iw = XX
+  jn = SJ
+  kgr = KG
+  kzr = KZ
+  lir = LT
+  ln = KI
+  lvr = LV
+  mh = MO
+  mvr = MD
+  nm = MP
+  pt = TL
+  rur = RU
+  ry = JP
+  sb = SJ
+  sk = IN
+  sv = HN
+  tar = TJ
+  tkr = TM
+  tt = PC
+  ui = GB
+  uk = GB
+  unr = UA
   ur = SU
+  uzr = UZ
+  vn = VN
+  vs = VN
+  wb = DE
+  xi = KN
+  xxr = SU
+  ys = YE
   yu = YU
 }
 
