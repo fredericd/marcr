@@ -1,0 +1,35 @@
+# Build the marcr CLI and attach it to a GitHub release on each vX.Y.Z tag
+# (marcr-rules-vX.Y.Z tags don't match).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Oldest available runner: the binary links against its glibc.
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked -p marcr
+      - name: Package
+        run: |
+          name=marcr-${GITHUB_REF_NAME}-${{ matrix.target }}
+          mkdir "$name"
+          cp target/release/marcr README.md LICENSE-MIT LICENSE-APACHE "$name"
+          tar czf "$name.tar.gz" "$name"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: marcr-*.tar.gz
