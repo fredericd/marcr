@@ -1,10 +1,16 @@
 # Build a CLI and attach it to a GitHub release: marcr on vX.Y.Z tags,
-# marcr-rules on marcr-rules-vX.Y.Z tags.
+# marcr-rules on marcr-rules-vX.Y.Z tags. Run it by hand (Actions tab) for
+# a tag pushed before this workflow existed.
 name: Release
 
 on:
   push:
     tags: ["v*", "marcr-rules-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (vX.Y.Z or marcr-rules-vX.Y.Z)
+        required: true
 
 permissions:
   contents: write
@@ -21,18 +27,22 @@ jobs:
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     env:
-      BIN: ${{ startsWith(github.ref_name, 'marcr-rules-') && 'marcr-rules' || 'marcr' }}
+      TAG: ${{ inputs.tag || github.ref_name }}
+      BIN: ${{ startsWith(inputs.tag || github.ref_name, 'marcr-rules-') && 'marcr-rules' || 'marcr' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked -p "$BIN"
       - name: Package
         run: |
-          name=$BIN-${GITHUB_REF_NAME#marcr-rules-}-${{ matrix.target }}
+          name=$BIN-${TAG#marcr-rules-}-${{ matrix.target }}
           mkdir "$name"
           cp "target/release/$BIN" LICENSE-MIT LICENSE-APACHE "$name"
           [ "$BIN" = marcr ] && cp README.md "$name" || cp marcr-rules/README.md "$name"
           tar czf "$name.tar.gz" "$name"
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
           files: ${{ env.BIN }}-*.tar.gz
