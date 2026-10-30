@@ -46,3 +46,5 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           files: ${{ env.BIN }}-*.tar.gz
+          # "Latest" on the releases page stays the marcr CLI.
+          make_latest: ${{ env.BIN == 'marcr' }}
